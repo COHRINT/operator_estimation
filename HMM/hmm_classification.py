@@ -2,147 +2,77 @@ from __future__ import division
 import matplotlib.pyplot as plt
 import sys
 import numpy as np
-import h5py
 from hmmlearn import hmm
 from copy import deepcopy
 import warnings
 import os
-from gaussianMixtures import GM, Gaussian
 import time
-sys.path.append("../../../scenario_simulator/modules/")
+import copy
+from tqdm import tqdm
+
+sys.path.append("../data_sim/")
 from DynamicsProfiles import *
+from gaussianMixtures import GM
 
 class HMM_Classification():
 
-    def __init__(self, modelFileName='../data/histModels_fams.npy',genus=0):
+    def __init__(self):
         pass
         #  self.models = loadModels(modelFileName)
-        #  self.species = Cumuliform(genus=genus, weather=False)
-        #  self.family_names = ['Stratiform', 'Cirriform', 'Stratocumuliform', 'Cumuliform', 'Cumulonibiform']
-        #  self.genus_names = ['Cumuliform0', 'Cumuliform1', 'Cumuliform2', 'Cumuliform3', 'Cumuliform4']
 
-    def buildModels(self, dataSet, saveFileName='../data/histModels_final.npy', sizes=300):
-        #  models = ['Stratiform','Cirriform','Stratocumuliform','Cumuliform','Cumulonibiform']
-        models = ['Cumuliform']
+    def buildModels(self, dataSet, saveFileName='hmm_train.npy'):
 
         histModels = {}
         warnings.filterwarnings("ignore")
-        for mod in models:
-            print("Now building model {} from historical data.".format(mod))
-            allFamData = []
-            allFamLengths = []
-            for i in range(5):
-                print("Genus: {}".format(i))
-                allTypeData = []
-                allTypeLengths = []
-                h = dataSet[mod][str(i)]
-                for j in range(sizes):
-                    allFamData.append(h[j][0:-1].tolist())
-                    allFamLengths.append(len(h[j][0:-1]))
-                    allTypeData.append(h[j][0:-1].tolist())
-                    allTypeLengths.append(len(h[j][0:-1]))
+        for i in tqdm(range(5),ncols=100):
+            allTypeData = []
+            allTypeLengths = []
+            currentSet = dataSet[i]
+            for j in range(len(currentSet)):
+                allTypeLengths.append(len(currentSet[j,:]))
 
 
-                for k in range(len(allTypeData)):
-                    for j in range(len(allTypeData[k])):
-                        allTypeData[k][j] = [allTypeData[k][j]]
+            currentSet=np.reshape(currentSet,(currentSet.shape[0]*currentSet.shape[1],1))
 
-                allTypeData = np.concatenate(allTypeData)
+            allModels = []
+            BICScores = []
+            for n_states in range(2,10):
+                modelTest = hmm.GaussianHMM(n_components=n_states).fit(currentSet,allTypeLengths)
+                allModels.append(modelTest)
+                logLikelihood,posteriors = modelTest.score_samples(currentSet,allTypeLengths)
+                bic = np.log(len(currentSet))*n_states - 2*logLikelihood
+                BICScores.append(bic)
 
-                allModels = []
-                allBIC = []
-                for j in range(2,9):
-                    a = hmm.GaussianHMM(n_components=j).fit(allTypeData,allTypeLengths)
-                    allModels.append(a)
-                    llh,posteriors = a.score_samples(allTypeData)
-                    bic = 0
-                    for k in range(len(allTypeData)):
-                        bic += np.log(len(allTypeData[k]))*j - 2*llh
-                    bic = bic/len(allTypeData)
-                    allBIC.append(bic)
+            bestModel = allModels[np.argmin(BICScores)]
+            best = {}
+            best['transition'] = bestModel.transmat_.tolist()
+            best['prior'] = bestModel.startprob_.tolist()
 
-                bestModel = allModels[np.argmin(allBIC)]
-                best = {}
-                best['transition'] = bestModel.transmat_.tolist()
-                best['prior'] = bestModel.startprob_.tolist()
+            means = bestModel.means_.tolist()
+            var = bestModel.covars_.tolist()
+            obs = []
+            for j in range(len(means)):
+                obs.append(GM(means[j],var[j],1))
 
-                means = bestModel.means_.tolist()
-                var = bestModel.covars_.tolist()
-                obs = []
-                for j in range(len(means)):
-                    obs.append(GM(means[j],var[j],1))
+            best['obs'] = obs
 
-                best['obs'] = obs
+            histModels['Cumuliform'+str(i)] = best
 
-                nam = mod + str(i)
-                print("Completed Profile: {}".format(nam))
-                histModels[nam] = best
-
-
-#              for k in range(len(allFamData)):
-#                  for j in range(len(allFamData[k])):
-#                      allFamData[k][j] = [allFamData[k][j]]
-#              allFamData = np.concatenate(allFamData)
-
-#              allModels = []
-#              allBIC = []
-#              for j in range(2,15):
-#                  a = hmm.GaussianHMM(n_components=j).fit(allFamData,allFamLengths)
-#                  allModels.append(a)
-#                  llh,posteriors = a.score_samples(allFamData[0])
-#                  bic = 0
-#                  for k in range(len(allFamData)):
-#                      bic += np.log(len(allFamData[k]))*j - 2*llh
-#                  bic = bic/len(allFamData)
-#                  allBIC.append(bic)
-#              bestModel = allModels[np.argmin(allBIC)]
-#              best = {}
-#              best['transition'] = bestModel.transmat_.tolist()
-#              best['prior'] = bestModel.startprob_.tolist()
-
-
-#              means = bestModel.means_.tolist()
-#              var = bestModel.covars_.tolist()
-#              obs = []
-#              for j in range(len(means)):
-#                  obs.append(GM(means[j],var[j],1))
-
-#              best['obs'] = obs
-
-#              nam = mod
-#              print("Completed Profile: {}".format(nam))
-#              histModels[nam] = best
-
-        #  saveFile = open(saveFileName,'w')
         np.save(saveFileName,histModels)
 
-
-    def buildDataSet(self, size=300, weather=True):
-
-        #get an intensity from each
-        #  models = [Stratiform, Cirriform, Stratocumuliform, Cumuliform, Cumulonibiform]
-        models = [Cumuliform]
-        subs = [str(i) for i in range(5)]
-
-        allSeries = {}
-
-        baseSeries = {}
-        for mod in models:
-            #baseSeries[mod.__name__] = {}
-            allSeries[mod.__name__] = {}
-            for i in range(5):
-                a = mod(genus = i,weather=weather)
-                allSeries[mod.__name__][str(i)] = []
-                for j in range(size):
-                    b = deepcopy(a.intensityModel)
-                    c = b+np.random.normal(0,2,(len(b)))
-                    for k in range(len(c)):
-                        c[k] = max(c[k],1e-5)
-
-                    allSeries[mod.__name__][str(i)].append(c)
-
+    def buildDataSet(self, num_sets=100):
+        #  models=[Cumuliform]
+        subs=[str(i) for i in range(5)]
+        allSeries=np.empty((5,num_sets,100))
+        for i in range(5):
+            model=Cumuliform(genus=i,weather=False)
+            b=copy.deepcopy(model.intensityModel)
+            for j in range(num_sets):
+                c=b+np.random.normal(0,2,(len(b)))
+                for k in range(len(c)):
+                    c[k]=max(c[k],1e-5)
+                allSeries[i,j,:]=c
         return allSeries
-
 
 
     def continueForward(self, newData, model, prevAlpha=[-1,-1]):
@@ -162,72 +92,42 @@ class HMM_Classification():
             newAlpha[xcur] = newAlpha[xcur]*pyx[xcur].pointEval(newData)
         return newAlpha
 
-
-    def humanTesting(self):
-        modelFileName = '../data/histModels_final.npy'
+    def testHMM(self,num_tar):
+        modelFileName = 'hmm_train.npy'
         models = np.load(modelFileName).item()
-        #  print models
 
-        #  genus = 'Cirriform0'
-        species = Cirriform(genus = 0,weather=False)
-        data = species.intensityModel
-
-        #  famNames = ['Stratiform','Cirriform','Stratocumuliform','Cumuliform','Cumulonibiform']
         genNames = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
-        
-        obsMod = {}
-        obsMod['Cumuliform0'] = [.7,.1,.2,.2,.2,.6,.2,.2,.6,.2,.2,.6,.2,.2,.6]
-        obsMod['Cumuliform1'] = [.2,.2,.6,.7,.1,.2,.2,.2,.6,.2,.2,.6,.2,.2,.6]
-        obsMod['Cumuliform2'] = [.2,.2,.6,.2,.2,.6,.7,.1,.2,.2,.2,.6,.2,.2,.6]
-        obsMod['Cumuliform3'] = [.2,.2,.6,.2,.2,.6,.2,.2,.6,.7,.1,.2,.2,.2,.6]
-        obsMod['Cumuliform4'] = [.2,.2,.6,.2,.2,.6,.2,.2,.6,.2,.2,.6,.7,.1,.2]
+        correct=0
+        #  for i in range(num_tar):
+        for i in tqdm(range(num_tar),ncols=100):
+            genus=np.random.randint(5)
+            species = Cumuliform(genus = genus,weather=False)
+            data = species.intensityModel
 
-        #  obsMod = {}
-        #  obsMod['Stratiform'] = [.7,.1,.2,.2,.2,.6,.2,.2,.6,.2,.2,.6,.2,.2,.6]
-        #  obsMod['Cirriform'] = [.2,.2,.6,.7,.1,.2,.2,.2,.6,.2,.2,.6,.2,.2,.6]
-        #  obsMod['Stratocumuliform'] = [.2,.2,.6,.2,.2,.6,.7,.1,.2,.2,.2,.6,.2,.2,.6]
-        #  obsMod['Cumuliform'] = [.2,.2,.6,.2,.2,.6,.2,.2,.6,.7,.1,.2,.2,.2,.6]
-        #  obsMod['Cumulonibiform'] = [.2,.2,.6,.2,.2,.6,.2,.2,.6,.2,.2,.6,.7,.1,.2]
 
-        alphas = {}
-        for i in genNames:
-            alphas[i] = [-1,-1]
-
-        probs = {}
-        for i in genNames:
-            probs[i] = 1
-
-        #for each bit of data
-        for d in data:
-            #update classification probs
+            alphas = {}
             for i in genNames:
-                alphas[i] = self.continueForward(d, models[i], alphas[i])
-                probs[i] = probs[i]*sum(alphas[i])
+                alphas[i] = [-1,-1]
 
-            #normalize probs
-            suma = sum(probs.values())
+            probs = {}
             for i in genNames:
-                probs[i] = probs[i]/suma
+                probs[i] = .2
 
-            #show to human
-            #get human observation
-            print(probs)
-            ob = int(raw_input("Which observation would you like to make?"))
+            while max(probs.values())<0.9:
+                for d in data:
+                    #update classification probs
+                    for i in genNames:
+                        alphas[i] = self.continueForward(d, models[i], alphas[i])
+                        probs[i] = probs[i]*sum(alphas[i])
 
-            #  ob = -1
-            #print('up')
-            if ob != -1:
-                #apply bayes rule
-                for i in genNames:
-                    probs[i] = probs[i]*obsMod[i][ob]
-
-            #normalize probs
-            suma = sum(probs.values())
-            for i in genNames:
-                probs[i] = probs[i]/suma
-
-            self.probabilities = probs
-
+                    #normalize probs
+                    suma = sum(probs.values())
+                    for i in genNames:
+                        probs[i] = probs[i]/suma
+            chosen=np.argmax(probs.values())
+            if genus==chosen:
+                correct+=1
+        print (correct/num_tar)
 
 if __name__ == '__main__':
     hc=HMM_Classification()
@@ -236,9 +136,8 @@ if __name__ == '__main__':
         commands.append(sys.argv[i])
 
     if 'train' in commands:
-        filename='../data/histModels_final.npy'
-        dataSet=hc.buildDataSet(100,weather=False)
-        hc.buildModels(dataSet,filename,100)
+        dataSet=hc.buildDataSet(100)
+        hc.buildModels(dataSet)
 
     if 'test' in commands:
-        hc.humanTesting()
+        hc.testHMM(100)
