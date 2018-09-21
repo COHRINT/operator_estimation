@@ -16,11 +16,12 @@ from sklearn.metrics import precision_recall_curve
 np.set_printoptions(precision=2)
 
 from data_sim.DynamicsProfiles import *
+from HMM.hmm_classification import HMM_Classification
 
 warnings.filterwarnings("ignore",category=RuntimeWarning)
 
 __author__ = "Jeremy Muesing"
-__version__ = "2.1"
+__version__ = "2.1.0"
 __maintainer__ = "Jeremy Muesing"
 __email__ = "jeremy.muesing@colorado.edu"
 __status__ = "maintained"

@@ -10,7 +10,7 @@ import time
 import copy
 from tqdm import tqdm
 
-sys.path.append("../data_sim/")
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'data_sim')))
 from DynamicsProfiles import *
 from gaussianMixtures import GM
 
