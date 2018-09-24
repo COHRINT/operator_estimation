@@ -17,6 +17,7 @@ np.set_printoptions(precision=2)
 
 from data_sim.DynamicsProfiles import *
 from HMM.hmm_classification import HMM_Classification
+from gaussianMixtures import GM
 
 warnings.filterwarnings("ignore",category=RuntimeWarning)
 
@@ -28,7 +29,15 @@ __status__ = "maintained"
 
 class Validation():
     def __init__(self):
-
+        self.hmm=HMM_Classification()
+        self.pred_obs=[]
+        self.real_obs=[]
+        #  self.hist_check=False
+        #  self.sample_check=[]
+        modelFileName = 'HMM/hmm_train.npy'
+        self.hmm_models = np.load(modelFileName).item()
+        self.names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
+        self.alphas={}
         theta1_table=self.DirPrior()
         self.theta1=np.zeros((5,10))
         self.theta2_correct=np.zeros((50,10))
@@ -123,6 +132,24 @@ class Validation():
                     theta2[i,j]=alphas[3]/(num_tar-1)
         return theta2
 
+    def make_data(self,genus):
+        model=Cumuliform(genus=genus,weather=False)
+        intensity_data=model.intensityModel+np.random.normal(0,2,(len(model.intensityModel)))
+        for j in range(len(intensity_data)):
+            intensity_data[j]=max(intensity_data[j],1e-5)
+        self.intensity_data=intensity_data
+
+    def updateProbsML(self):
+        data=self.intensity_data[self.frame]
+        #forward algorithm
+        for i in self.names:
+            self.alphas[i]=self.hmm.continueForward(data,self.hmm_models[i],self.alphas[i])
+            self.probs[i]=self.probs[i]*sum(self.alphas[i])
+        #noramlize
+        suma=sum(self.probs.values())
+        for i in self.names:
+            self.probs[i]/=suma
+
     def updateProbs(self,num_tar,real_target):
         names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
         
@@ -155,26 +182,26 @@ class Validation():
         theta2=copy.deepcopy(theta2_static)
         #  print "Observation: %s" % obs_names[self.obs[-1]]
         for n in range(num_samples):
-            for i in names:
+            for i in self.names:
                 # pay no mind to the theat2, this is the theta1 value
-                if names.index(i)*2==self.obs[0]:
+                if self.names.index(i)*2==self.obs[0]:
                     #tp
                     likelihood=theta2[0]
                 elif self.obs[0]%2==0:
                     #fp
                     likelihood=theta2[1]
-                if names.index(i)*2+1==self.obs[0]:
+                if self.names.index(i)*2+1==self.obs[0]:
                     #fn
                     likelihood=(theta2[2]/(num_tar-1))
                 elif self.obs[0]%2==1:
                     #tn
                     likelihood=(theta2[3]/(num_tar-1))
-                #  likelihood=self.theta1[names.index(i),self.obs[0]]
+                #  likelihood=self.theta1[self.names.index(i),self.obs[0]]
                 # sample from theta2
                 if len(self.obs)>1:
                     count=0
                     for value in self.obs[1:]:
-                        if names.index(i)*2==value:
+                        if self.names.index(i)*2==value:
                             #tp
                             if value==self.obs[count]:
                                 likelihood*=theta2[4]
@@ -186,7 +213,7 @@ class Validation():
                                 likelihood*=theta2[5]
                             else:
                                 likelihood*=theta2[1]
-                        if names.index(i)*2+1==value:
+                        if self.names.index(i)*2+1==value:
                             #fn
                             if value==self.obs[count]:
                                 likelihood*=(theta2[6]/(num_tar-1))
@@ -203,7 +230,7 @@ class Validation():
                 postX[i]=self.probs[i]*likelihood
             suma=sum(postX.values())
             # normalize
-            for i in names:
+            for i in self.names:
                 postX[i]=np.log(postX[i])-np.log(suma) 
                 postX[i]=np.exp(postX[i])
             if n%5==0:
@@ -238,8 +265,8 @@ class Validation():
                     else:
                         alphas[3]+=1
                 theta2=np.random.dirichlet(alphas)
-                if self.hist_check:
-                    self.sample_check.append(theta2[4])
+                #  if self.hist_check:
+                #      self.sample_check.append(theta2[4])
                 if n%5==0:
                     theta2_samples[int(n/5)]=theta2
 
@@ -266,8 +293,8 @@ class Validation():
                         self.table[k]=alphak
 
         post_probs=np.mean(all_post,axis=0)
-        for i in names:
-            self.probs[i]=post_probs[0][names.index(i)]
+        for i in self.names:
+            self.probs[i]=post_probs[0][self.names.index(i)]
 
 def KLD(mean_i,mean_j,var_i,var_j):
 
@@ -291,44 +318,39 @@ if __name__ == '__main__':
     true_tar=[]
     pred_tar=[]
     pred_percent=[]
-    sim.pred_obs=[]
-    sim.real_obs=[]
-    sim.hist_check=False
-    sim.sample_check=[]
-    #  theta_real_ind=np.empty((5,10))
-    #  theta_calc_ind=np.empty((5,10))
-    names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
     correct=[0]*num_tar
     correct_percent=[]
     correct_ml=[0]*num_tar
     correct_percent_ml=[]
-    #  correct_ind=[0]*num_tar
-    #  correct_percent_ind=[]
     time_graph=[]
     segment=time.time()
     for n in tqdm(range(num_tar),ncols=100):
         time_graph.append(time.time()-segment)
-        if n==num_tar-1:
-            sim.hist_check=True
+        #  if n==num_tar-1:
+        #      sim.hist_check=True
         # initialize target type
         genus=np.random.randint(5)
+        sim.make_data(genus)
+        sim.frame=0
+        for i in sim.names:
+            sim.alphas[i]=[-1,-1]
 
         if commands[1]=='uniform':
             sim.probs={}
-            for i in names:
+            for i in sim.names:
                 sim.probs[i]=.2
             correct_ml[n]=np.random.choice([0,0,0,0,1],p=sim.probs.values())
             correct_percent_ml.append(sum(correct_ml)/(n+1))
         elif commands[1]=='assist':
             sim.probs={}
-            for i in names:
-                if names.index(i)==genus:
+            for i in self.names:
+                if sim.names.index(i)==genus:
                     sim.probs[i]=np.random.normal(.75,.25)
                 else:
                     sim.probs[i]=np.random.normal(.25,.25)
                 if sim.probs[i]<0:
                     sim.probs[i]=0.01
-            for i in names:
+            for i in sim.names:
                 sim.probs[i]/=sum(sim.probs.values())
             chosen_ml=max(sim.probs.values())
             if genus==sim.probs.values().index(chosen_ml):
@@ -338,6 +360,12 @@ if __name__ == '__main__':
         sim.obs=[]
         # 5 observations per target
         while max(sim.probs.values())<0.9:
+            for i in range(sim.frame,sim.frame+10):
+            #      if i<100:
+            #          sim.updateProbsML()
+            #          sim.frame+=1
+            #          print sim.probs
+            #  sys.exit()
             sim.updateProbs(5,genus)
         chosen=max(sim.probs.values())
         pred_percent.append(chosen)
