@@ -126,6 +126,7 @@ class HMM_Classification():
                     for i in genNames:
                         probs[i] = probs[i]/suma
             chosen=np.argmax(probs.values())
+            #  print genus,chosen
             if genus==chosen:
                 correct+=1
         print (correct/num_tar)

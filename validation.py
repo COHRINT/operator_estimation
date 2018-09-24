@@ -39,11 +39,12 @@ class Validation():
         self.names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
         self.alphas={}
         theta1_table=self.DirPrior()
-        self.theta1=np.zeros((5,10))
+        # doesn't change
+        self.theta1=scipy.stats.dirichlet.mean(alpha=self.table[0:4])
+        self.theta1_correct=np.zeros((5,10))
         self.theta2_correct=np.zeros((50,10))
-        #  self.table_ind=np.mean(self.table,axis=1)
         for X in range(5):
-            self.theta1[X,:]=scipy.stats.dirichlet.mean(alpha=np.mean(theta1_table,axis=1)[X,:])
+            self.theta1_correct[X,:]=scipy.stats.dirichlet.mean(alpha=np.mean(theta1_table,axis=1)[X,:])
         self.table_real[self.table_real<0]=0.1
         for X in range(5):
             for prev_obs in range(10):
@@ -164,7 +165,7 @@ class Validation():
             prev_obs=self.obs[-1]
             self.obs.append(np.random.choice(range(10),p=self.theta2_correct[real_target*10+prev_obs,:]))
         else:
-            self.obs.append(np.random.choice(range(10),p=self.theta1[real_target,:]))
+            self.obs.append(np.random.choice(range(10),p=self.theta1_correct[real_target,:]))
         # confusion matrix for human
         if self.obs[-1]%2==0:
             self.pred_obs.append(0)
@@ -183,20 +184,18 @@ class Validation():
         #  print "Observation: %s" % obs_names[self.obs[-1]]
         for n in range(num_samples):
             for i in self.names:
-                # pay no mind to the theat2, this is the theta1 value
                 if self.names.index(i)*2==self.obs[0]:
                     #tp
-                    likelihood=theta2[0]
+                    likelihood=self.theta1[0]
                 elif self.obs[0]%2==0:
                     #fp
-                    likelihood=theta2[1]
+                    likelihood=self.theta1[1]
                 if self.names.index(i)*2+1==self.obs[0]:
                     #fn
-                    likelihood=(theta2[2]/(num_tar-1))
+                    likelihood=(self.theta1[2]/(num_tar-1))
                 elif self.obs[0]%2==1:
                     #tn
-                    likelihood=(theta2[3]/(num_tar-1))
-                #  likelihood=self.theta1[self.names.index(i),self.obs[0]]
+                    likelihood=(self.theta1[3]/(num_tar-1))
                 # sample from theta2
                 if len(self.obs)>1:
                     count=0
@@ -210,15 +209,15 @@ class Validation():
                         elif value%2==0:
                             #fp
                             if value==self.obs[count]:
-                                likelihood*=theta2[5]
+                                likelihood*=(theta2[5]/(num_tar-1))
                             else:
-                                likelihood*=theta2[1]
+                                likelihood*=(theta2[1]/(num_tar-1))
                         if self.names.index(i)*2+1==value:
                             #fn
                             if value==self.obs[count]:
-                                likelihood*=(theta2[6]/(num_tar-1))
+                                likelihood*=theta2[6]
                             else:
-                                likelihood*=(theta2[2]/(num_tar-1))
+                                likelihood*=theta2[2]
                         elif value%2==1:
                             #tn
                             if value==self.obs[count]:
@@ -323,9 +322,10 @@ if __name__ == '__main__':
     correct_ml=[0]*num_tar
     correct_percent_ml=[]
     time_graph=[]
-    segment=time.time()
+    #  segment=time.time()
     for n in tqdm(range(num_tar),ncols=100):
-        time_graph.append(time.time()-segment)
+        #  time_graph.append(time.time()-segment)
+        #  segment=time.time()
         #  if n==num_tar-1:
         #      sim.hist_check=True
         # initialize target type
@@ -343,7 +343,7 @@ if __name__ == '__main__':
             correct_percent_ml.append(sum(correct_ml)/(n+1))
         elif commands[1]=='assist':
             sim.probs={}
-            for i in self.names:
+            for i in sim.names:
                 if sim.names.index(i)==genus:
                     sim.probs[i]=np.random.normal(.75,.25)
                 else:
@@ -360,7 +360,7 @@ if __name__ == '__main__':
         sim.obs=[]
         # 5 observations per target
         while max(sim.probs.values())<0.9:
-            for i in range(sim.frame,sim.frame+10):
+            #  for i in range(sim.frame,sim.frame+10):
             #      if i<100:
             #          sim.updateProbsML()
             #          sim.frame+=1
@@ -446,13 +446,13 @@ if __name__ == '__main__':
     cax=plt.axes([0.93,0.25,0.025,0.5])
     plt.colorbar(cax=cax)
 
-    plt.figure(3)
-    plt.hist(sim.sample_check,100)
+    #  plt.figure(3)
+    #  plt.hist(sim.sample_check,100)
 
-    plt.figure(4)
-    plt.plot(range(len(time_graph)),time_graph)
-    plt.xlabel('Target #')
-    plt.ylabel('Seconds')
+    #  plt.figure(4)
+    #  plt.plot(range(len(time_graph)),time_graph)
+    #  plt.xlabel('Target #')
+    #  plt.ylabel('Seconds')
 
     plt.show()
 
