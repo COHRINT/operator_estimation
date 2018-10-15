@@ -1,8 +1,5 @@
 
-    def updateProbs(self,real_target):
-        names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
-        obs_names=['Yes-0','No-0','Yes-1','No-1','Yes-2','No-2','Yes-3','No-3','Yes-4','No-4']
-        
+    def sampling_full(self,real_target):
         # initialize Dir sample
         num_samples=5000
         sample_check=[]
@@ -35,17 +32,17 @@
         theta2=copy.deepcopy(theta2_static)
         #  print "Observation: %s" % obs_names[self.obs[-1]]
         for n in range(num_samples):
-            for i in names:
-                likelihood=self.theta1[names.index(i),self.obs[0]]
+            for i in self.names:
+                likelihood=self.theta1[self.names.index(i),self.obs[0]]
                 # sample from theta2
                 if len(self.obs)>1:
                     for value in self.obs[1:]:
-                        likelihood*=theta2[names.index(i)*10+self.obs[self.obs.index(value)-1],value]
+                        likelihood*=theta2[self.names.index(i)*10+self.obs[self.obs.index(value)-1],value]
                 #  print likelihood
                 postX[i]=self.probs[i]*likelihood
             suma=sum(postX.values())
             # normalize
-            for i in names:
+            for i in self.names:
                 postX[i]=np.log(postX[i])-np.log(suma) 
                 postX[i]=np.exp(postX[i])
             if n%5==0:
@@ -88,5 +85,5 @@
                             self.table[int(n/10),n%10,k]=alphak
 
         post_probs=np.mean(all_post,axis=0)
-        for i in names:
-            self.probs[i]=post_probs[0][names.index(i)]
+        for i in self.names:
+            self.probs[i]=post_probs[0][self.names.index(i)]
