@@ -2,11 +2,14 @@ from __future__ import division
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import matplotlib.image as mgimg
 import scipy.stats
 from scipy.special import gamma, psi, polygamma
 import random
 import copy
 import sys
+import os
 import itertools
 import warnings
 import time
@@ -28,8 +31,6 @@ __email__ = "jeremy.muesing@colorado.edu"
 __status__ = "maintained"
 
 class Human():
-    def __init__(self):
-        pass
 
     def DirPrior(self,num_tar):
         #init for confusion matrix
@@ -96,7 +97,6 @@ class Human():
             for prev_obs in range(2*num_tar):
                 self.theta2_correct[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=table_real[X,prev_obs,:])
         # for graphing
-        self.theta_val=self.theta2_correct[15,2]
 
     def HumanObservations(self,num_tar,real_target,obs):
         if len(obs)>0:
@@ -350,13 +350,34 @@ class DataFusion(Human):
             index=select_index(target,current_obs)
             return index
 
-def KLD(mean_i,mean_j,var_i,var_j):
-
-    dist=.5*((var_i**2/var_j**2)+var_j**2*(mean_j-mean_i)**2-1+np.log(var_j**2/var_i**2))
-
-    return np.absolute(dist)
 
 class Graphing():
+    def __init__(self,num_events,num_tar,alphas_start,theta2,true_tar,pred_tar,real_obs,pred_obs,
+            correct_percent,correct_percent_ml,correct,pred_percent,all_theta2_tied,all_theta2_full,
+            theta2_correct):
+        self.num_events=num_events
+        self.num_tar=num_tar
+        self.alphas_start=alphas_start
+        self.theta2=theta2
+        self.true_tar=true_tar
+        self.pred_tar=pred_tar
+        self.real_obs=real_obs
+        self.pred_obs=pred_obs
+        self.correct_percent=correct_percent
+        self.correct_percent_ml=correct_percent_ml
+        self.correct=correct
+        self.pred_percent=pred_percent
+        self.all_theta2_tied=all_theta2_tied
+        self.all_theta2_full=all_theta2_full
+        self.theta2_correct=theta2_correct
+
+        self.gif_time=10
+
+        self.theta_validation()
+        #  self.experimental_results()
+        #  self.human_validation()
+        #  self.convergence_validation()
+
 
     def build_theta2(self,num_tar,alphas):
         def select_index(tar,obs):
@@ -381,6 +402,10 @@ class Graphing():
                 theta2[i,j]=alphas[index1,index2]
         return theta2
 
+    def KLD(self,mean_i,mean_j,var_i,var_j):
+        dist=.5*((var_i**2/var_j**2)+var_j**2*(mean_j-mean_i)**2-1+np.log(var_j**2/var_i**2))
+        return np.absolute(dist)
+
     def lagk_correlation(self,data):
         "https://www.itl.nist.gov/div898/handbook/eda/section3/eda35c.htm"
         rhok=[]
@@ -396,24 +421,61 @@ class Graphing():
             rhok.append(numerator/denominator)
         return rhok.mean()
 
-    def theta_validation(self,alphas_start,alphas,theta_real):
-        starting_params=self.build_theta2(5,alphas_start)
-        estimated_params=self.build_theta2(5,alphas)
-        mean_start=scipy.stats.dirichlet.mean(alpha=starting_params[15,:])[2]
-        std_start=np.sqrt(scipy.stats.dirichlet.var(alpha=starting_params[15,:])[2])
-        mean_est=scipy.stats.dirichlet.mean(alpha=estimated_params[15,:])[2]
-        std_est=np.sqrt(scipy.stats.dirichlet.var(alpha=estimated_params[15,:])[2])
+    def theta_validation(self):
+        def guassian(x,m,o):
+            return 1/(o*np.sqrt(2*np.pi))*np.exp(-(x-m)**2/(2*o**2))
 
-        plt.figure()
-        plt.plot(np.linspace(0,1),1/(std_est*np.sqrt(2*np.pi))*np.exp(-(np.linspace(0,1)-mean_est)**2/(2*std_est**2)),label=r"Estimated $p(\theta_2)$")
-        plt.plot(np.linspace(0,1),1/(std_start*np.sqrt(2*np.pi))*np.exp(-(np.linspace(0,1)-mean_start)**2/(2*std_start**2)),label=r"Starting $p(\theta_2)$")
-        plt.scatter(theta_real,0,label=r"$\theta_2$")
-        plt.legend()
+        breakdown=[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
 
-    def experimental_results(self,num_events,true_tar,pred_tar,real_obs,pred_obs,correct_percent,correct_percent_ml,correct,pred_percent):
+        for i in range(self.theta2_correct.shape[0]):
+            if 2*int(i/(2*self.num_tar))==i%(2*self.num_tar):
+                index1=0
+            elif i%2==0:
+                index1=1
+            if 2*int(i/(2*self.num_tar))+1==i%(2*self.num_tar):
+                index1=2
+            elif i%2==1:
+                index1=3
+
+            for j in range(self.theta2_correct.shape[1]):
+                if 2*int(i/(2*self.num_tar))==j:
+                    index2=0
+                elif j%2==0:
+                    index2=1
+                if 2*int(i/(2*self.num_tar))+1==j:
+                    index2=2
+                elif j%2==1:
+                    index2=3
+
+                breakdown[index1*4+index2].append(self.theta2_correct[i,j])
+
+        starting_params=self.build_theta2(self.num_tar,self.alphas_start)
+        estimated_params=self.build_theta2(self.num_tar,self.theta2)
+        mean_start=np.empty((4,2*self.num_tar))
+        std_start=np.empty((4,2*self.num_tar))
+        mean_est=np.empty((4,2*self.num_tar))
+        std_est=np.empty((4,2*self.num_tar))
+        std_est=np.empty((4,2*self.num_tar))
+        order=[0,2,1,3] #tp,fp,fn,tn
+        for i in range(4):
+            mean_start[i,:]=scipy.stats.dirichlet.mean(alpha=starting_params[order[i],:])
+            std_start[i,:]=scipy.stats.dirichlet.var(alpha=starting_params[order[i],:])
+            mean_est[i,:]=scipy.stats.dirichlet.mean(alpha=estimated_params[order[i],:])
+            std_est[i,:]=scipy.stats.dirichlet.var(alpha=estimated_params[order[i],:])
+
+        fig,ax=plt.subplots(nrows=4,ncols=4,figsize=((15,15)),tight_layout=True)
+        x=np.linspace(0,1)
+        for i in range(4):
+            for j in range(4):
+                ax[i,j].plot(x,guassian(x,mean_start[i,order[j]],std_start[i,order[j]]),label=r"Starting $p(\theta_2)$")
+                ax[i,j].plot(x,guassian(x,mean_est[i,order[j]],std_est[i,order[j]]),label=r"Estimated $p(\theta_2)$")
+                ax[i,j].scatter(breakdown[i*4+j],len(breakdown[i*4+j])*[0],label=r'$\theta$')
+                ax[i,j].legend()
+
+    def experimental_results(self):
         plt.figure()
         plt.subplot(221)
-        cm=confusion_matrix(true_tar,pred_tar)
+        cm=confusion_matrix(self.true_tar,self.pred_tar)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
         plt.imshow(cm,cmap='Blues')
         plt.ylabel('True Label')
@@ -423,7 +485,7 @@ class Graphing():
             plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         plt.subplot(222)
-        cm=confusion_matrix(real_obs,pred_obs)
+        cm=confusion_matrix(self.real_obs,self.pred_obs)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
         plt.imshow(cm,cmap='Blues')
         plt.ylabel('True Value')
@@ -435,15 +497,15 @@ class Graphing():
             plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         plt.subplot(223)
-        plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct")
-        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml[5:], label="wo/Human Total Correct")
+        plt.plot([n+5 for n in range(self.num_events-5)],self.correct_percent[5:], label="w/Human Total Correct")
+        plt.plot([n+5 for n in range(self.num_events-5)],self.correct_percent_ml[5:], label="wo/Human Total Correct")
         plt.legend()
         plt.xlabel('Number of Targets')
         plt.ylabel('Percent Correct')
         plt.title('Correct Classification')
 
         plt.subplot(224)
-        precision, recall, _ =precision_recall_curve(correct,pred_percent)
+        precision, recall, _ =precision_recall_curve(self.correct,self.pred_percent)
         plt.step(recall,precision,where='post')
         plt.xlim([0.0,1.0])
         plt.ylim([0.0,1.0])
@@ -451,45 +513,164 @@ class Graphing():
         plt.ylabel('Precission')
         plt.title('Precision Recall Curve')
 
-    def human_validation(self,num_tar,alphas_tied,alphas_full):
-        #  total_difference=np.empty([1,50,10])
-        #  theta_real_mean=np.empty((50,10))
-        #  theta_calc_mean=np.empty((50,10))
-        #  theta_real_var=np.empty((50,10))
-        #  theta_calc_var=np.empty((50,10))
-        theta2_tied=self.build_theta2(5,alphas_tied)
-        theta2_full=self.build_theta2(5,alphas_full)
-        for X in range(num_tar):
-            for prev_obs in range(2*num_tar):
-                theta_real_mean[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=theta2_full[X,prev_obs,:])
-                theta_real_var[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=theta2_full[X,prev_obs,:])
-                theta_calc_mean[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=theta2_tied[X*2*num_tar+prev_obs,:])
-                theta_calc_var[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=theta2_tied[X*2*num_tar+prev_obs,:])
-        if (n%int((num_events/10))==0) or n==(num_events-1):
-            difference=np.empty([2*num_tar*num_tar,2*num_tar])
-            for i in range(difference.shape[0]):
-                for j in range(difference.shape[1]):
-                    #TODO
-                    difference[i,j]=KLD(theta_real_mean[i,j],theta_calc_mean[i,j],theta_real_var[i,j],theta_calc_var[i,j])
-            total_difference=np.append(total_difference,np.expand_dims(difference,axis=0),axis=0)
+    def human_validation(self):
+        total_difference_tied=np.empty([self.num_events,2*num_tar*num_tar,2*num_tar])
+        total_difference_full=np.empty([self.num_events,2*num_tar*num_tar,2*num_tar])
+        avg_difference_tied=np.empty((self.num_events))
+        avg_difference_full=np.empty((self.num_events))
+        for n in range(self.num_events):
+            theta2_tied=self.build_theta2(self.num_tar,self.all_theta2_tied[n,:,:])
 
-        plt.figure()
-        d=np.abs(total_difference[1:,:,:]-np.median(total_difference[1:,:,:]))
+            theta_real_mean=np.empty((2*num_tar*num_tar,2*num_tar))
+            theta_real_var=np.empty((2*num_tar*num_tar,2*num_tar))
+            theta_tied_mean=np.empty((2*num_tar*num_tar,2*num_tar))
+            theta_tied_var=np.empty((2*num_tar*num_tar,2*num_tar))
+            theta_full_mean=np.empty((2*num_tar*num_tar,2*num_tar))
+            theta_full_var=np.empty((2*num_tar*num_tar,2*num_tar))
+            for X in range(num_tar):
+                for prev_obs in range(2*num_tar):
+                    theta_real_mean[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_correct[X*2*num_tar+prev_obs,:])
+                    theta_real_var[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=self.theta2_correct[X*2*num_tar+prev_obs,:])
+                    theta_tied_mean[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=theta2_tied[X*2*num_tar+prev_obs,:])
+                    theta_tied_var[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=theta2_tied[X*2*num_tar+prev_obs,:])
+                    theta_full_mean[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
+                    theta_full_var[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
+            for i in range(total_difference_tied.shape[1]):
+                for j in range(total_difference_tied.shape[2]):
+                    total_difference_tied[n,i,j]=self.KLD(theta_real_mean[i,j],theta_tied_mean[i,j],theta_real_var[i,j],theta_tied_var[i,j])
+                    total_difference_full[n,i,j]=self.KLD(theta_real_mean[i,j],theta_full_mean[i,j],theta_real_var[i,j],theta_full_var[i,j])
+            one_dim_tied=np.reshape(theta_tied_mean,(1,4*num_tar**3))
+            one_dim_full=np.reshape(theta_full_mean,(1,4*num_tar**3))
+            one_dim_correct=np.reshape(self.theta2_correct,(1,4*num_tar**3))
+            avg_difference_tied[n]=scipy.stats.entropy(one_dim_tied[0],one_dim_correct[0])
+            avg_difference_full[n]=scipy.stats.entropy(one_dim_full[0],one_dim_correct[0])
+
+        d=np.abs(total_difference_tied[1:,:,:]-np.median(total_difference_tied[1:,:,:]))
         mdev=np.median(d)
-        vmax=2*mdev+np.median(total_difference[1:,:,:])
-        for i in range(11):
-            plt.subplot(1,11,i+1)
-            plt.imshow(total_difference[i+1],cmap='hot',vmin=np.min(total_difference[1:,:,:]),vmax=vmax)
-            #  plt.imshow(np.log(total_difference[i+1]),cmap='hot',vmin=np.min(np.log(total_difference[1:,:,:])),vmax=np.max(np.log(total_difference[1:,:,:])))
-            plt.xticks([])
-            plt.yticks([])
-            plt.xlabel('%d Targets' % (int(num_tar/10)*i))
-            if i==5:
-                plt.title('KLD for Dirichlet Distributions')
-        cax=plt.axes([0.93,0.25,0.025,0.5])
-        plt.colorbar(cax=cax)
+        vmax=2*mdev+np.median(total_difference_tied[1:,:,:])
+        fig=plt.figure(figsize=(10,15),tight_layout=True)
+        for frame in range(self.num_events):
+            imgplot0=plt.subplot2grid((5,2),(0,0),rowspan=4)
+            imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied[1:,:,:]),vmax=vmax)
+            imgplot0.set_xticks([])
+            imgplot0.set_yticks([])
+            imgplot1=plt.subplot2grid((5,2),(0,1),rowspan=4)
+            imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_tied[1:,:,:]),vmax=vmax)
+            imgplot1.set_xticks([])
+            imgplot1.set_yticks([])
+            imgplot2=plt.subplot2grid((5,2),(4,0))
+            imgplot2.plot(np.linspace(0,frame,frame),avg_difference_tied[0:frame],'c')
+            imgplot2.set_xlabel('Number of Events')
+            imgplot2.set_ylabel(r'KLD of all $\theta$')
+            imgplot2.set_xlim(0,self.num_events)
+            imgplot2.set_ylim(0,max(avg_difference_tied))
+            imgplot3=plt.subplot2grid((5,2),(4,1))
+            imgplot3.plot(np.linspace(0,frame,frame),avg_difference_full[0:frame],'c')
+            imgplot3.set_xlabel('Number of Events')
+            imgplot3.set_ylabel(r'KLD of all $\theta$')
+            imgplot3.set_xlim(0,self.num_events)
+            imgplot3.set_ylim(0,max(avg_difference_full))
+
+            fig.savefig('figures/tmp/human'+str(frame)+'.png',bbox_inches='tight',pad_inches=0,dpi=400)
+            #  plt.pause(0.2)
+        fig.clear()
+        plt.close()
+        fig,ax=plt.subplots(figsize=(10,15),tight_layout=True)
+        images=[]
+        for k in range(1,self.num_events):
+            fname='figures/tmp/human%d.png' % k
+            img=mgimg.imread(fname)
+            imgplot=plt.imshow(img)
+            plt.axis('off')
+            images.append([imgplot])
+        ani=animation.ArtistAnimation(fig,images)
+        ani.save("figures/human_validation.gif",fps=self.num_events/self.gif_time)
+        fig.clear()
+        plt.close()
+            #  plt.xlabel('%d Targets' % (int(num_tar/10)*i))
+        #  cax=plt.axes([0.93,0.25,0.025,0.5])
+        #  plt.colorbar(cax=cax)
 
     def convergence_validation(self):
+        total_difference_tied=np.empty([self.num_events-1,4,4])
+        total_difference_full=np.empty([self.num_events-1,2*num_tar*num_tar,2*num_tar])
+        avg_difference_tied=np.empty((self.num_events-1))
+        avg_difference_full=np.empty((self.num_events-1))
+        theta_tied_mean=np.empty((self.num_events,4,4))
+        theta_tied_var=np.empty((self.num_events,4,4))
+        theta_full_mean=np.empty((self.num_events,2*num_tar*num_tar,2*num_tar))
+        theta_full_var=np.empty((self.num_events,2*num_tar*num_tar,2*num_tar))
+        for n in range(self.num_events):
+            for X in range(num_tar):
+                for prev_obs in range(2*num_tar):
+                    theta_full_mean[n,X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
+                    theta_full_var[n,X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
+            for i in range(4):
+                theta_tied_mean[n,i,:]=scipy.stats.dirichlet.mean(alpha=self.theta2[i,:])
+                theta_tied_var[n,i,:]=scipy.stats.dirichlet.var(alpha=self.theta2[i,:])
+        for n in range(self.num_events)[1:]:
+            for i in range(total_difference_tied.shape[1]):
+                for j in range(total_difference_tied.shape[2]):
+                    total_difference_tied[n-1,i,j]=self.KLD(theta_tied_mean[n,i,j],theta_tied_mean[n-1,i,j],theta_tied_var[n,i,j],theta_tied_var[n-1,i,j])
+            for i in range(total_difference_full.shape[1]):
+                for j in range(total_difference_full.shape[2]):
+                    total_difference_full[n-1,i,j]=self.KLD(theta_full_mean[n,i,j],theta_full_mean[n-1,i,j],theta_full_var[n,i,j],theta_full_var[n-1,i,j])
+
+            one_dim_tied_old=np.reshape(theta_tied_mean[n-1],(1,16))
+            one_dim_tied=np.reshape(theta_tied_mean[n],(1,16))
+            one_dim_full_old=np.reshape(theta_full_mean[n-1],(1,4*num_tar**3))
+            one_dim_full=np.reshape(theta_full_mean[n],(1,4*num_tar**3))
+            avg_difference_tied[n-1]=scipy.stats.entropy(one_dim_tied_old[0],one_dim_tied[0])
+            avg_difference_full[n-1]=scipy.stats.entropy(one_dim_full_old[0],one_dim_full[0])
+
+        d=np.abs(total_difference_tied[1:,:,:]-np.median(total_difference_tied[1:,:,:]))
+        mdev=np.median(d)
+        vmax=2*mdev+np.median(total_difference_tied[1:,:,:])
+        fig=plt.figure(figsize=(10,15),tight_layout=True)
+        for frame in range(self.num_events-1):
+            imgplot0=plt.subplot2grid((5,2),(0,0),rowspan=4)
+            imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied[1:,:,:]),vmax=vmax)
+            imgplot0.set_xticks([])
+            imgplot0.set_yticks([])
+            imgplot1=plt.subplot2grid((5,2),(0,1),rowspan=4)
+            imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_tied[1:,:,:]),vmax=vmax)
+            imgplot1.set_xticks([])
+            imgplot1.set_yticks([])
+            imgplot2=plt.subplot2grid((5,2),(4,0))
+            imgplot2.plot(np.linspace(0,frame,frame),avg_difference_tied[0:frame],'c')
+            imgplot2.set_xlabel('Number of Events')
+            imgplot2.set_ylabel(r'KLD of all $\theta$')
+            imgplot2.set_xlim(0,self.num_events)
+            imgplot2.set_ylim(0,max(avg_difference_tied))
+            imgplot3=plt.subplot2grid((5,2),(4,1))
+            imgplot3.plot(np.linspace(0,frame,frame),avg_difference_full[0:frame],'c')
+            imgplot3.set_xlabel('Number of Events')
+            imgplot3.set_ylabel(r'KLD of all $\theta$')
+            imgplot3.set_xlim(0,self.num_events)
+            imgplot3.set_ylim(0,max(avg_difference_full))
+
+            fig.savefig('figures/tmp/converge'+str(frame)+'.png',bbox_inches='tight',pad_inches=0,dpi=400)
+            #  plt.pause(0.2)
+        fig.clear()
+        plt.close()
+        fig,ax=plt.subplots(figsize=(10,15),tight_layout=True)
+        images=[]
+        for k in range(1,self.num_events):
+            fname='figures/tmp/converge%d.png' % k
+            img=mgimg.imread(fname)
+            imgplot=plt.imshow(img)
+            plt.axis('off')
+            images.append([imgplot])
+        ani=animation.ArtistAnimation(fig,images)
+        ani.save("figures/convergence_validation.gif",fps=self.num_events/self.gif_time)
+        fig.clear()
+        plt.close()
+
+    def dependent_independent_compare(self):
+        pass
+
+    def accuracy_comparison(self):
+        # compare between independent and dependent
         pass
 
 
@@ -498,6 +679,7 @@ if __name__ == '__main__':
     for i in range(1,len(sys.argv)):
         commands.append(sys.argv[i])
     num_events=int(commands[0])
+    num_tar=5
 
     # initializing variables
 
@@ -511,14 +693,16 @@ if __name__ == '__main__':
     correct_percent=[]
     correct_ml=[0]*num_events
     correct_percent_ml=[]
+    # human validation
+    all_theta2_tied=np.empty((num_events,4,4))
+    all_theta2_full=np.empty((num_events,2*num_tar*num_tar,2*num_tar))
 
     # start sim
     full_sim=DataFusion()
-    full_sim.DirPrior(5)
+    full_sim.DirPrior(num_tar)
     param_tied_sim=DataFusion()
-    param_tied_sim.DirPrior(5)
-    alphas_start=param_tied_sim.theta2
-    num_tar=5
+    param_tied_sim.DirPrior(num_tar)
+    alphas_start=copy.deepcopy(param_tied_sim.theta2)
     for n in tqdm(range(num_events),ncols=100):
         # initialize target type
         genus=np.random.randint(num_tar)
@@ -565,11 +749,11 @@ if __name__ == '__main__':
             #          sim.frame+=1
             #          print sim.probs
             #  sys.exit()
-            obs=param_tied_sim.HumanObservations(5,genus,obs)
+            obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
             if max(full_sim.probs.values())<0.9:
-                full_sim.sampling_full(5,obs)
+                full_sim.sampling_full(num_tar,obs)
             if max(param_tied_sim.probs.values())<0.9:
-                param_tied_sim.sampling_param_tied(5,obs)
+                param_tied_sim.sampling_param_tied(num_tar,obs)
         chosen=max(param_tied_sim.probs.values())
         pred_percent.append(chosen)
         true_tar.append(genus)
@@ -577,10 +761,15 @@ if __name__ == '__main__':
         if genus==param_tied_sim.probs.values().index(chosen):
             correct[n]=1
         correct_percent.append(sum(correct)/(n+1))
+        all_theta2_tied[n,:,:]=param_tied_sim.theta2
+        theta2_full_alphas=np.empty((2*num_tar*num_tar,2*num_tar))
+        for X in range(num_tar):
+            for prev_obs in range(2*num_tar):
+                theta2_full_alphas[X*2*num_tar+prev_obs,:]=full_sim.theta2_full[X,prev_obs,:]
+        all_theta2_full[n,:,:]=theta2_full_alphas
 
 
-    graphs=Graphing()
-    graphs.theta_validation(alphas_start,param_tied_sim.theta2,param_tied_sim.theta_val)
-    graphs.experimental_results(num_events,true_tar,pred_tar,param_tied_sim.real_obs,param_tied_sim.pred_obs,
-            correct_percent,correct_percent_ml,correct,pred_percent)
+    graphs=Graphing(num_events,num_tar,alphas_start,param_tied_sim.theta2,
+            true_tar,pred_tar,param_tied_sim.real_obs,param_tied_sim.pred_obs,correct_percent,
+            correct_percent_ml,correct,pred_percent,all_theta2_tied,all_theta2_full,param_tied_sim.theta2_correct)
     plt.show()
