@@ -154,6 +154,7 @@ class DataFusion(Human):
         self.hmm_models = np.load(modelFileName).item()
         self.names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
         self.alphas={}
+        self.sampling_data=True
 
     def make_data(self,genus):
         model=Cumuliform(genus=genus,weather=False)
@@ -284,7 +285,7 @@ class DataFusion(Human):
                 postX[i]=np.log(postX[i])-np.log(suma) 
                 postX[i]=np.exp(postX[i])
             if n%5==0:
-                all_post[int((n-self.burn_in)/num_tar),:,:]=postX.values()
+                all_post[int((n-self.burn_in)/5),:,:]=postX.values()
             # sample from X
             X=np.random.choice(range(num_tar),p=postX.values())
             alphas=copy.deepcopy(self.theta2)
@@ -294,8 +295,11 @@ class DataFusion(Human):
                 alphas[indicies[0],indicies[1]]+=1
                 theta2[indicies[0],:]=np.random.dirichlet(alphas[indicies[0],:])
                 if n%5==0:
-                    theta2_samples[int((n-self.burn_in)/5),indicies[0]]=theta2[indicies[0],indicies[1]]
+                    theta2_samples[int((n-self.burn_in)/5),indicies[0],:]=theta2[indicies[0],:]
 
+        if self.sampling_data:
+            self.theta2_samples=theta2_samples
+            self.X_samples=all_post
         if len(obs)>1:
             sample_counts=np.zeros((4,4))
             # estimation of alphas from distributions
@@ -303,7 +307,7 @@ class DataFusion(Human):
                 pk_top_list=[]
                 sum_alpha=sum(self.theta2[n,:])
                 for k in range(4):
-                    samples=theta2_samples[np.nonzero(theta2_samples[:,k]),k]
+                    samples=theta2_samples[np.nonzero(theta2_samples[:,n,k]),n,k]
                     if len(samples[0])==0:
                         pass
                     else:
@@ -354,7 +358,7 @@ class DataFusion(Human):
 class Graphing():
     def __init__(self,num_events,num_tar,alphas_start,theta2,true_tar,pred_tar,real_obs,pred_obs,
             correct_percent,correct_percent_ml,correct,pred_percent,all_theta2_tied,all_theta2_full,
-            theta2_correct):
+            theta2_correct,theta2_samples,X_samples):
         self.num_events=num_events
         self.num_tar=num_tar
         self.alphas_start=alphas_start
@@ -370,10 +374,13 @@ class Graphing():
         self.all_theta2_tied=all_theta2_tied
         self.all_theta2_full=all_theta2_full
         self.theta2_correct=theta2_correct
+        self.theta2_samples=theta2_samples
+        self.X_samples=X_samples
 
-        self.gif_time=10
+        self.gif_time=10 #seconds
 
-        self.theta_validation()
+        #  self.theta_validation()
+        self.gibbs_validation()
         #  self.experimental_results()
         #  self.human_validation()
         #  self.convergence_validation()
@@ -408,69 +415,76 @@ class Graphing():
 
     def lagk_correlation(self,data):
         "https://www.itl.nist.gov/div898/handbook/eda/section3/eda35c.htm"
-        rhok=[]
-        for X in data:
-            n=len(X)
-            k=1
+        rhok=np.empty(len(data))
+        mean=np.mean(data)
+        for k in range(len(data)):
+            n=len(data)
             numerator=0
             for i in range(n-k):
-                numerator+=(X[i]-X.mean())*(X[i+k]-X.mean())
+                numerator+=(data[i]-mean)*(data[i+k]-mean)
             denominator=0
             for i in range(n):
-                denominator+=(X[i]-X.mean())^2
-            rhok.append(numerator/denominator)
-        return rhok.mean()
+                denominator+=(data[i]-mean)**2
+            rhok[k]=(numerator/denominator)
+        return rhok
 
     def theta_validation(self):
-        def guassian(x,m,o):
-            return 1/(o*np.sqrt(2*np.pi))*np.exp(-(x-m)**2/(2*o**2))
-
         breakdown=[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
 
         for i in range(self.theta2_correct.shape[0]):
             if 2*int(i/(2*self.num_tar))==i%(2*self.num_tar):
-                index1=0
+                index1=0 #tp
             elif i%2==0:
-                index1=1
+                index1=2 #fp
             if 2*int(i/(2*self.num_tar))+1==i%(2*self.num_tar):
-                index1=2
+                index1=1 #fn
             elif i%2==1:
-                index1=3
+                index1=3 #tn
 
             for j in range(self.theta2_correct.shape[1]):
                 if 2*int(i/(2*self.num_tar))==j:
                     index2=0
                 elif j%2==0:
-                    index2=1
-                if 2*int(i/(2*self.num_tar))+1==j:
                     index2=2
+                if 2*int(i/(2*self.num_tar))+1==j:
+                    index2=1
                 elif j%2==1:
                     index2=3
 
                 breakdown[index1*4+index2].append(self.theta2_correct[i,j])
 
-        starting_params=self.build_theta2(self.num_tar,self.alphas_start)
-        estimated_params=self.build_theta2(self.num_tar,self.theta2)
-        mean_start=np.empty((4,2*self.num_tar))
-        std_start=np.empty((4,2*self.num_tar))
-        mean_est=np.empty((4,2*self.num_tar))
-        std_est=np.empty((4,2*self.num_tar))
-        std_est=np.empty((4,2*self.num_tar))
-        order=[0,2,1,3] #tp,fp,fn,tn
+        alpha_beta_start=np.empty((4,4,2))
+        alpha_beta_est=np.empty((4,4,2))
         for i in range(4):
-            mean_start[i,:]=scipy.stats.dirichlet.mean(alpha=starting_params[order[i],:])
-            std_start[i,:]=scipy.stats.dirichlet.var(alpha=starting_params[order[i],:])
-            mean_est[i,:]=scipy.stats.dirichlet.mean(alpha=estimated_params[order[i],:])
-            std_est[i,:]=scipy.stats.dirichlet.var(alpha=estimated_params[order[i],:])
+            for j in range(4):
+                alpha_beta_start[i,j,:]=[self.alphas_start[i,j],sum(self.alphas_start[i,:])-self.alphas_start[i,j]]
+                alpha_beta_est[i,j,:]=[self.theta2[i,j],sum(self.theta2[i,:])-self.theta2[i,j]]
 
         fig,ax=plt.subplots(nrows=4,ncols=4,figsize=((15,15)),tight_layout=True)
         x=np.linspace(0,1)
         for i in range(4):
             for j in range(4):
-                ax[i,j].plot(x,guassian(x,mean_start[i,order[j]],std_start[i,order[j]]),label=r"Starting $p(\theta_2)$")
-                ax[i,j].plot(x,guassian(x,mean_est[i,order[j]],std_est[i,order[j]]),label=r"Estimated $p(\theta_2)$")
+                ax[i,j].plot(x,scipy.stats.beta.pdf(x,alpha_beta_start[i,j,0],alpha_beta_start[i,j,1]),label=r"Starting $p(\theta_2)$")
+                ax[i,j].plot(x,scipy.stats.beta.pdf(x,alpha_beta_est[i,j,0],alpha_beta_est[i,j,1]),label=r"Estimated $p(\theta_2)$")
                 ax[i,j].scatter(breakdown[i*4+j],len(breakdown[i*4+j])*[0],label=r'$\theta$')
                 ax[i,j].legend()
+
+    def gibbs_validation(self):
+        for i in range(16):
+            if len(self.theta2_samples[i])==0:
+                print "At least one case produced no samples, must have samples for gibbs graph"
+                return
+        plt.figure(tight_layout=True)
+        for i in range(4):
+            for j in range(4):
+                ax0=plt.subplot2grid((8,12),(2*i,3*j),colspan=2)
+                ax0.plot(range(len(self.theta2_samples[4*i+j])),self.theta2_samples[4*i+j])
+                ax0.set_ylim((0,1))
+                ax1=plt.subplot2grid((8,12),(2*i,3*j+2))
+                ax1.hist(self.theta2_samples[4*i+j],bins=20,range=(0,1))
+                ax2=plt.subplot2grid((8,12),(2*i+1,3*j),colspan=3)
+                corr=self.lagk_correlation(self.theta2_samples[4*i+j])
+                ax2.plot(range(len(corr)),corr)
 
     def experimental_results(self):
         plt.figure()
@@ -696,6 +710,8 @@ if __name__ == '__main__':
     # human validation
     all_theta2_tied=np.empty((num_events,4,4))
     all_theta2_full=np.empty((num_events,2*num_tar*num_tar,2*num_tar))
+    # gibbs validations
+    theta2_samples=[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
 
     # start sim
     full_sim=DataFusion()
@@ -749,11 +765,23 @@ if __name__ == '__main__':
             #          sim.frame+=1
             #          print sim.probs
             #  sys.exit()
+            # used for mixing graphs
+
             obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
             if max(full_sim.probs.values())<0.9:
                 full_sim.sampling_full(num_tar,obs)
             if max(param_tied_sim.probs.values())<0.9:
                 param_tied_sim.sampling_param_tied(num_tar,obs)
+            # need a run where all 16 have been sampled, keep storing until a run produces that
+            for i in range(4):
+                for j in range(4):
+                    samples=param_tied_sim.theta2_samples[np.nonzero(param_tied_sim.theta2_samples[:,i,j]),i,j]
+                    if len(samples[0])>len(theta2_samples[i*4+j]):
+                        theta2_samples[i*4+j]=samples[0]
+                        
+
+
+        # building graphing parameters
         chosen=max(param_tied_sim.probs.values())
         pred_percent.append(chosen)
         true_tar.append(genus)
@@ -771,5 +799,6 @@ if __name__ == '__main__':
 
     graphs=Graphing(num_events,num_tar,alphas_start,param_tied_sim.theta2,
             true_tar,pred_tar,param_tied_sim.real_obs,param_tied_sim.pred_obs,correct_percent,
-            correct_percent_ml,correct,pred_percent,all_theta2_tied,all_theta2_full,param_tied_sim.theta2_correct)
+            correct_percent_ml,correct,pred_percent,all_theta2_tied,all_theta2_full,param_tied_sim.theta2_correct,
+            theta2_samples,param_tied_sim.X_samples)
     plt.show()
