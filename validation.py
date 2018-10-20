@@ -96,7 +96,6 @@ class Human():
         for X in range(num_tar):
             for prev_obs in range(2*num_tar):
                 self.theta2_correct[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=table_real[X,prev_obs,:])
-        # for graphing
 
     def HumanObservations(self,num_tar,real_target,obs):
         if len(obs)>0:
@@ -185,40 +184,45 @@ class DataFusion(Human):
             for prev_obs in range(2*num_tar):
                 theta2_static[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
 
+        # begin gibbs sampling
         theta2=copy.deepcopy(theta2_static)
         for n in range(self.num_samples):
+            # calc X as if we knew theta2
             for i in self.names:
+                # likelihood from theta1 (not full dist, assuming we know theta1)
                 index=self.select_param(self.names.index(i),obs[0])
                 if index%2==0:
                     likelihood=self.theta1[index]
                 else:
                     likelihood=(self.theta1[index]/(num_tar-1))
-                # sample from theta2
+                # likelihood from theta2
                 if len(obs)>1:
                     for value in obs[1:]:
                         likelihood*=theta2[self.names.index(i)*2*num_tar+obs[obs.index(value)-1],value]
                 #  print likelihood
                 postX[i]=self.probs[i]*likelihood
-            suma=sum(postX.values())
             # normalize
+            suma=sum(postX.values())
             for i in self.names:
                 postX[i]=np.log(postX[i])-np.log(suma) 
                 postX[i]=np.exp(postX[i])
+            # store every 5th sample
             if n%5==0:
                 all_post[int((n-self.burn_in)/5),:,:]=postX.values()
             # sample from X
             X=np.random.choice(range(num_tar),p=postX.values())
             alphas=copy.deepcopy(self.theta2_full)
             theta2=copy.deepcopy(theta2_static)
+            # calc theta2 as if we knew X
             if len(obs)>1:
                 alphas[X,obs[-2],obs[-1]]+=1
                 theta2[X*2*num_tar+obs[-2],:]=np.random.dirichlet(alphas[X,obs[-2],:])
                 if n%5==0:
                     all_theta2[int((n-self.burn_in)/5),X*2*num_tar+obs[-2],:]=theta2[X*2*num_tar+obs[-2],:]
 
+        # moment matching of alphas from samples (Minka, 2000)
         if len(obs)>1:
             sample_counts=np.zeros((2*num_tar*num_tar,2*num_tar))
-            # estimation of alphas from distributions
             for n in range(all_theta2.shape[1]):
                 pk_top_list=[]
                 sum_alpha=sum(self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),:])
@@ -243,6 +247,7 @@ class DataFusion(Human):
                                 alphak-=((psi(alphak)-y)/polygamma(1,alphak))
                             self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]=alphak
 
+        # take max likelihood of X for next obs
         post_probs=np.mean(all_post,axis=0)
         for i in self.names:
             self.probs[i]=post_probs[0][self.names.index(i)]
@@ -258,16 +263,18 @@ class DataFusion(Human):
         for i in range(4):
             theta2_static[i,:]=scipy.stats.dirichlet.mean(alpha=self.theta2[i,:])
 
+        # begin gibbs sampling
         theta2=copy.deepcopy(theta2_static)
         for n in range(self.num_samples):
+            # calc X as if we knew theta2
             for i in self.names:
-                # sample from theta1
+                # lieklihood from theta1
                 index=self.select_param(self.names.index(i),obs[0])
                 if index%2==0:
                     likelihood=self.theta1[index]
                 else:
                     likelihood=(self.theta1[index]/(num_tar-1))
-                # sample from theta2
+                # likelihood from theta2
                 if len(obs)>1:
                     count=0
                     for value in obs[1:]:
@@ -279,17 +286,19 @@ class DataFusion(Human):
                         count+=1
                 #  print likelihood
                 postX[i]=self.probs[i]*likelihood
-            suma=sum(postX.values())
             # normalize
+            suma=sum(postX.values())
             for i in self.names:
                 postX[i]=np.log(postX[i])-np.log(suma) 
                 postX[i]=np.exp(postX[i])
+            # store every 5th sample
             if n%5==0:
                 all_post[int((n-self.burn_in)/5),:,:]=postX.values()
             # sample from X
             X=np.random.choice(range(num_tar),p=postX.values())
             alphas=copy.deepcopy(self.theta2)
             theta2=copy.deepcopy(theta2_static)
+            # calc theta2 as is we knew X
             if len(obs)>1:
                 indicies=self.select_param(X,obs[-1],obs[-2])
                 alphas[indicies[0],indicies[1]]+=1
@@ -297,12 +306,15 @@ class DataFusion(Human):
                 if n%5==0:
                     theta2_samples[int((n-self.burn_in)/5),indicies[0],:]=theta2[indicies[0],:]
 
+        # storing data for graphs
         if self.sampling_data:
             self.theta2_samples=theta2_samples
+        if max(postX.values())<0.5:
             self.X_samples=all_post
+
+        # moment matching of alphas from samples (Minka, 2000)
         if len(obs)>1:
             sample_counts=np.zeros((4,4))
-            # estimation of alphas from distributions
             for n in range(4):
                 pk_top_list=[]
                 sum_alpha=sum(self.theta2[n,:])
@@ -327,11 +339,13 @@ class DataFusion(Human):
                                 alphak-=((psi(alphak)-y)/polygamma(1,alphak))
                             self.theta2[n,k]=alphak
 
+        # take max likelihood of X for next obs
         post_probs=np.mean(all_post,axis=0)
         for i in self.names:
             self.probs[i]=post_probs[0][self.names.index(i)]
 
     def select_param(self,target,current_obs,prev_obs=None):
+        # translate an observation about a target into its type of obs
         def select_index(tar,obs):
             if tar*2==obs:
                 #tp
@@ -379,14 +393,20 @@ class Graphing():
 
         self.gif_time=10 #seconds
 
-        #  self.theta_validation()
+        print "Making Theta Validation Plots"
+        self.theta_validation()
+        print "Making Gibbs Validation Plots"
         self.gibbs_validation()
-        #  self.experimental_results()
-        #  self.human_validation()
+        print "Making Experiment Results Plot"
+        self.experimental_results()
+        print "Making Theta2 Validation GIF"
+        self.human_validation()
+        #  print "Making Convergence GIF"
         #  self.convergence_validation()
 
 
     def build_theta2(self,num_tar,alphas):
+        # make full theta2 table from param tied table
         def select_index(tar,obs):
             if tar*2==obs:
                 #tp
@@ -429,8 +449,11 @@ class Graphing():
         return rhok
 
     def theta_validation(self):
+        # need to make a dynamic sized list for all 16 params
+        # there are a different number of parameters for each type
         breakdown=[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
 
+        # assigning the theta2_correct table to tp,fp,fn,tn values
         for i in range(self.theta2_correct.shape[0]):
             if 2*int(i/(2*self.num_tar))==i%(2*self.num_tar):
                 index1=0 #tp
@@ -451,8 +474,12 @@ class Graphing():
                 elif j%2==1:
                     index2=3
 
-                breakdown[index1*4+index2].append(self.theta2_correct[i,j])
+                if (index2==2) or (index2==3):
+                    breakdown[index1*4+index2].append((self.num_tar-1)*self.theta2_correct[i,j])
+                else:
+                    breakdown[index1*4+index2].append(self.theta2_correct[i,j])
 
+        # maginalizing out dimentions of dirichlet into beta functions
         alpha_beta_start=np.empty((4,4,2))
         alpha_beta_est=np.empty((4,4,2))
         for i in range(4):
@@ -460,34 +487,70 @@ class Graphing():
                 alpha_beta_start[i,j,:]=[self.alphas_start[i,j],sum(self.alphas_start[i,:])-self.alphas_start[i,j]]
                 alpha_beta_est[i,j,:]=[self.theta2[i,j],sum(self.theta2[i,:])-self.theta2[i,j]]
 
+        strings=['TP','FP','FN','TN']
         fig,ax=plt.subplots(nrows=4,ncols=4,figsize=((15,15)),tight_layout=True)
+        #  fig.suptitle(r'Starting $p(\theta_2)$, Estimated $p(\theta_2)$, and True $\theta_2$',fontweight='bold')
         x=np.linspace(0,1)
         for i in range(4):
             for j in range(4):
                 ax[i,j].plot(x,scipy.stats.beta.pdf(x,alpha_beta_start[i,j,0],alpha_beta_start[i,j,1]),label=r"Starting $p(\theta_2)$")
                 ax[i,j].plot(x,scipy.stats.beta.pdf(x,alpha_beta_est[i,j,0],alpha_beta_est[i,j,1]),label=r"Estimated $p(\theta_2)$")
                 ax[i,j].scatter(breakdown[i*4+j],len(breakdown[i*4+j])*[0],label=r'$\theta$')
+                ax[i,j].set_xlabel(r'$\theta_2$')
+                ax[i,j].set_ylabel('PDF')
+                ax[i,j].set_title(strings[i]+', '+strings[j],fontweight='bold')
                 ax[i,j].legend()
+        fig.savefig('figures/theta_validation.png',bbox_inches='tight',pad_inches=0)
 
     def gibbs_validation(self):
         for i in range(16):
             if len(self.theta2_samples[i])==0:
                 print "At least one case produced no samples, must have samples for gibbs graph"
                 return
-        plt.figure(tight_layout=True)
+        strings=['TP','FP','FN','TN']
+        colors=['g','y','r','c']
+        fig1=plt.figure(figsize=(18,12),tight_layout=True)
+        fig1.suptitle(r'Signal, Histogram, and Autocorrelation of Gibbs Samples ($\theta_2$)',fontweight='bold')
         for i in range(4):
             for j in range(4):
-                ax0=plt.subplot2grid((8,12),(2*i,3*j),colspan=2)
-                ax0.plot(range(len(self.theta2_samples[4*i+j])),self.theta2_samples[4*i+j])
+                ax0=plt.subplot2grid((9,12),(2*i+1,3*j),colspan=2)
+                ax0.plot(range(len(self.theta2_samples[4*i+j])),self.theta2_samples[4*i+j],color=colors[i])
                 ax0.set_ylim((0,1))
-                ax1=plt.subplot2grid((8,12),(2*i,3*j+2))
-                ax1.hist(self.theta2_samples[4*i+j],bins=20,range=(0,1))
-                ax2=plt.subplot2grid((8,12),(2*i+1,3*j),colspan=3)
+                ax0.set_title(strings[i]+', '+strings[j],fontweight='bold',loc='right')
+                ax0.set_xlabel('Sample #')
+                ax0.set_ylabel(r'$\theta_2$')
+                ax1=plt.subplot2grid((9,12),(2*i+1,3*j+2))
+                ax1.hist(self.theta2_samples[4*i+j],bins=20,range=(0,1),color=colors[i])
+                ax1.set_xlabel(r'$\theta_2$')
+                ax1.set_ylabel('Frequency')
+                ax2=plt.subplot2grid((9,12),(2*i+2,3*j),colspan=3)
                 corr=self.lagk_correlation(self.theta2_samples[4*i+j])
-                ax2.plot(range(len(corr)),corr)
+                ax2.plot(range(len(corr)),corr,color=colors[i])
+                ax2.set_xlabel('Lag')
+                ax2.set_ylabel(r'$\rho$')
+        fig2=plt.figure(figsize=(16,12),tight_layout=True)
+        fig2.suptitle('Signal, Histogram, and Autocorrelation of Gibbs Samples (X)',fontweight='bold')
+        for i in range(self.num_tar):
+            ax0=plt.subplot2grid((2*(int(self.num_tar/2)+self.num_tar%2)+1,6),(2*int(i/2)+1,3*(i%2)),colspan=2)
+            ax0.plot(range(len(self.X_samples[:,:,i])),self.X_samples[:,:,i])
+            ax0.set_ylim((0,1))
+            ax0.set_title('X='+str(i),fontweight='bold',loc='right')
+            ax0.set_xlabel('Sample #')
+            ax0.set_ylabel('X')
+            ax1=plt.subplot2grid((2*(int(self.num_tar/2)+self.num_tar%2)+1,6),(2*int(i/2)+1,3*(i%2)+2))
+            ax1.hist(self.X_samples[:,:,i],bins=20,range=(0,1))
+            ax1.set_xlabel('X')
+            ax1.set_ylabel('Frequency')
+            ax2=plt.subplot2grid((2*(int(self.num_tar/2)+self.num_tar%2)+1,6),(2*int(i/2)+2,3*(i%2)),colspan=3)
+            corr=self.lagk_correlation(self.X_samples[:,:,i])
+            ax2.plot(range(len(corr)),corr)
+            ax2.set_xlabel('Lag')
+            ax2.set_ylabel(r'$\rho$')
+        fig1.savefig('figures/gibbs_validation_theta.png',bbox_inches='tight',pad_inches=0)
+        fig2.savefig('figures/gibbs_validation_X.png',bbox_inches='tight',pad_inches=0)
 
     def experimental_results(self):
-        plt.figure()
+        fig=plt.figure(figsize=(12,12))
         plt.subplot(221)
         cm=confusion_matrix(self.true_tar,self.pred_tar)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
@@ -526,6 +589,8 @@ class Graphing():
         plt.xlabel('Recall')
         plt.ylabel('Precission')
         plt.title('Precision Recall Curve')
+
+        fig.savefig('figures/experimental_results.png',bbox_inches='tight',pad_inches=0)
 
     def human_validation(self):
         total_difference_tied=np.empty([self.num_events,2*num_tar*num_tar,2*num_tar])
@@ -643,11 +708,11 @@ class Graphing():
         fig=plt.figure(figsize=(10,15),tight_layout=True)
         for frame in range(self.num_events-1):
             imgplot0=plt.subplot2grid((5,2),(0,0),rowspan=4)
-            imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied[1:,:,:]),vmax=vmax)
+            imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied[:,:,:]),vmax=np.max(total_difference_tied[:,:,:]))
             imgplot0.set_xticks([])
             imgplot0.set_yticks([])
             imgplot1=plt.subplot2grid((5,2),(0,1),rowspan=4)
-            imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_tied[1:,:,:]),vmax=vmax)
+            imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_full[:,:,:]),vmax=np.max(total_difference_tied[:,:,:]))
             imgplot1.set_xticks([])
             imgplot1.set_yticks([])
             imgplot2=plt.subplot2grid((5,2),(4,0))
@@ -669,7 +734,7 @@ class Graphing():
         plt.close()
         fig,ax=plt.subplots(figsize=(10,15),tight_layout=True)
         images=[]
-        for k in range(1,self.num_events):
+        for k in range(1,self.num_events-1):
             fname='figures/tmp/converge%d.png' % k
             img=mgimg.imread(fname)
             imgplot=plt.imshow(img)
@@ -726,6 +791,8 @@ if __name__ == '__main__':
 
         full_sim.probs={}
         param_tied_sim.probs={}
+
+        # getting a prior from ML
         if commands[1]=='uniform':
             for i in param_tied_sim.names:
                 full_sim.probs[i]=.2
@@ -765,13 +832,12 @@ if __name__ == '__main__':
             #          sim.frame+=1
             #          print sim.probs
             #  sys.exit()
-            # used for mixing graphs
-
             obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
             if max(full_sim.probs.values())<0.9:
                 full_sim.sampling_full(num_tar,obs)
             if max(param_tied_sim.probs.values())<0.9:
                 param_tied_sim.sampling_param_tied(num_tar,obs)
+
             # need a run where all 16 have been sampled, keep storing until a run produces that
             for i in range(4):
                 for j in range(4):
