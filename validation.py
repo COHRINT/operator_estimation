@@ -23,6 +23,7 @@ from HMM.hmm_classification import HMM_Classification
 from gaussianMixtures import GM
 
 warnings.filterwarnings("ignore",category=RuntimeWarning)
+warnings.filterwarnings("ignore",category=UserWarning)
 
 __author__ = "Jeremy Muesing"
 __version__ = "2.2.0"
@@ -509,9 +510,11 @@ class Graphing():
                 return
         strings=['TP','FP','FN','TN']
         colors=['g','y','r','c']
+        #  colors=[['#00ff00','#00ad00','#007a00','#00de00'],['#ffff00','#b3b300','#858500','#dada00'],
+        #          ['#ff0000','#9e0000','#770000','#d80000'],['#0000ff','#00009c','#00005d','#0000d8']]
         fig1=plt.figure(figsize=(18,12),tight_layout=True)
         fig1.suptitle(r'Signal, Histogram, and Autocorrelation of Gibbs Samples ($\theta_2$)',fontweight='bold')
-        for i in range(4):
+        for i in tqdm(range(4),ncols=100):
             for j in range(4):
                 ax0=plt.subplot2grid((9,12),(2*i+1,3*j),colspan=2)
                 ax0.plot(range(len(self.theta2_samples[4*i+j])),self.theta2_samples[4*i+j],color=colors[i])
@@ -530,7 +533,7 @@ class Graphing():
                 ax2.set_ylabel(r'$\rho$')
         fig2=plt.figure(figsize=(16,12),tight_layout=True)
         fig2.suptitle('Signal, Histogram, and Autocorrelation of Gibbs Samples (X)',fontweight='bold')
-        for i in range(self.num_tar):
+        for i in tqdm(range(self.num_tar),ncols=100):
             ax0=plt.subplot2grid((2*(int(self.num_tar/2)+self.num_tar%2)+1,6),(2*int(i/2)+1,3*(i%2)),colspan=2)
             ax0.plot(range(len(self.X_samples[:,:,i])),self.X_samples[:,:,i])
             ax0.set_ylim((0,1))
@@ -550,7 +553,7 @@ class Graphing():
         fig2.savefig('figures/gibbs_validation_X.png',bbox_inches='tight',pad_inches=0)
 
     def experimental_results(self):
-        fig=plt.figure(figsize=(12,12))
+        fig=plt.figure(figsize=(12,9))
         plt.subplot(221)
         cm=confusion_matrix(self.true_tar,self.pred_tar)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
@@ -630,13 +633,17 @@ class Graphing():
         fig=plt.figure(figsize=(10,15),tight_layout=True)
         for frame in tqdm(range(self.num_events),ncols=100):
             imgplot0=plt.subplot2grid((5,2),(0,0),rowspan=4)
-            imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied[1:,:,:]),vmax=vmax)
+            im=imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied),vmax=vmax)
+            fig.colorbar(im,ax=imgplot0)
             imgplot0.set_xticks([])
             imgplot0.set_yticks([])
+            imgplot0.set_title('KLD all params (tied)')
             imgplot1=plt.subplot2grid((5,2),(0,1),rowspan=4)
-            imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_tied[1:,:,:]),vmax=vmax)
+            im2=imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_full),vmax=vmax)
+            fig.colorbar(im2,ax=imgplot1)
             imgplot1.set_xticks([])
             imgplot1.set_yticks([])
+            imgplot1.set_title('KLD all params (full)')
             imgplot2=plt.subplot2grid((5,2),(4,0))
             imgplot2.plot(np.linspace(0,frame,frame),avg_difference_tied[0:frame],'c')
             imgplot2.set_xlabel('Number of Events')
@@ -709,13 +716,17 @@ class Graphing():
         fig=plt.figure(figsize=(10,15),tight_layout=True)
         for frame in tqdm(range(self.num_events-1),ncols=100):
             imgplot0=plt.subplot2grid((5,2),(0,0),rowspan=4)
-            imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied),vmax=np.max(total_difference_tied))
+            im=imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied),vmax=np.max(total_difference_tied))
+            fig.colorbar(im,ax=imgplot0)
             imgplot0.set_xticks([])
             imgplot0.set_yticks([])
+            imgplot0.set_title('KLD between events (tied)')
             imgplot1=plt.subplot2grid((5,2),(0,1),rowspan=4)
-            imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_full),vmax=np.max(total_difference_full))
+            im2=imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_full),vmax=np.max(total_difference_full))
+            fig.colorbar(im2,ax=imgplot1)
             imgplot1.set_xticks([])
             imgplot1.set_yticks([])
+            imgplot1.set_title('KLD between events (full)')
             imgplot2=plt.subplot2grid((5,2),(4,0))
             imgplot2.plot(np.linspace(0,frame,frame),avg_difference_tied[0:frame],'c')
             imgplot2.set_xlabel('Number of Events')
