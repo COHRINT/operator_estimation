@@ -401,8 +401,8 @@ class Graphing():
         self.experimental_results()
         print "Making Theta2 Validation GIF"
         self.human_validation()
-        #  print "Making Convergence GIF"
-        #  self.convergence_validation()
+        print "Making Convergence GIF"
+        self.convergence_validation()
 
 
     def build_theta2(self,num_tar,alphas):
@@ -597,7 +597,7 @@ class Graphing():
         total_difference_full=np.empty([self.num_events,2*num_tar*num_tar,2*num_tar])
         avg_difference_tied=np.empty((self.num_events))
         avg_difference_full=np.empty((self.num_events))
-        for n in range(self.num_events):
+        for n in tqdm(range(self.num_events),ncols=100):
             theta2_tied=self.build_theta2(self.num_tar,self.all_theta2_tied[n,:,:])
 
             theta_real_mean=np.empty((2*num_tar*num_tar,2*num_tar))
@@ -628,7 +628,7 @@ class Graphing():
         mdev=np.median(d)
         vmax=2*mdev+np.median(total_difference_tied[1:,:,:])
         fig=plt.figure(figsize=(10,15),tight_layout=True)
-        for frame in range(self.num_events):
+        for frame in tqdm(range(self.num_events),ncols=100):
             imgplot0=plt.subplot2grid((5,2),(0,0),rowspan=4)
             imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied[1:,:,:]),vmax=vmax)
             imgplot0.set_xticks([])
@@ -650,13 +650,14 @@ class Graphing():
             imgplot3.set_xlim(0,self.num_events)
             imgplot3.set_ylim(0,max(avg_difference_full))
 
-            fig.savefig('figures/tmp/human'+str(frame)+'.png',bbox_inches='tight',pad_inches=0,dpi=400)
+            #  fig.savefig('figures/tmp/human'+str(frame)+'.png',bbox_inches='tight',pad_inches=0,dpi=400)
+            fig.savefig('figures/tmp/human'+str(frame)+'.png',bbox_inches='tight',pad_inches=0)
             #  plt.pause(0.2)
         fig.clear()
         plt.close()
         fig,ax=plt.subplots(figsize=(10,15),tight_layout=True)
         images=[]
-        for k in range(1,self.num_events):
+        for k in tqdm(range(1,self.num_events),ncols=100):
             fname='figures/tmp/human%d.png' % k
             img=mgimg.imread(fname)
             imgplot=plt.imshow(img)
@@ -679,14 +680,14 @@ class Graphing():
         theta_tied_var=np.empty((self.num_events,4,4))
         theta_full_mean=np.empty((self.num_events,2*num_tar*num_tar,2*num_tar))
         theta_full_var=np.empty((self.num_events,2*num_tar*num_tar,2*num_tar))
-        for n in range(self.num_events):
+        for n in tqdm(range(self.num_events),ncols=100):
             for X in range(num_tar):
                 for prev_obs in range(2*num_tar):
                     theta_full_mean[n,X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
                     theta_full_var[n,X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
             for i in range(4):
-                theta_tied_mean[n,i,:]=scipy.stats.dirichlet.mean(alpha=self.theta2[i,:])
-                theta_tied_var[n,i,:]=scipy.stats.dirichlet.var(alpha=self.theta2[i,:])
+                theta_tied_mean[n,i,:]=scipy.stats.dirichlet.mean(alpha=self.all_theta2_tied[n,i,:])
+                theta_tied_var[n,i,:]=scipy.stats.dirichlet.var(alpha=self.all_theta2_tied[n,i,:])
         for n in range(self.num_events)[1:]:
             for i in range(total_difference_tied.shape[1]):
                 for j in range(total_difference_tied.shape[2]):
@@ -702,17 +703,17 @@ class Graphing():
             avg_difference_tied[n-1]=scipy.stats.entropy(one_dim_tied_old[0],one_dim_tied[0])
             avg_difference_full[n-1]=scipy.stats.entropy(one_dim_full_old[0],one_dim_full[0])
 
-        d=np.abs(total_difference_tied[1:,:,:]-np.median(total_difference_tied[1:,:,:]))
-        mdev=np.median(d)
-        vmax=2*mdev+np.median(total_difference_tied[1:,:,:])
+        #  d=np.abs(total_difference_tied[1:,:,:]-np.median(total_difference_tied[1:,:,:]))
+        #  mdev=np.median(d)
+        #  vmax=2*mdev+np.median(total_difference_tied[1:,:,:])
         fig=plt.figure(figsize=(10,15),tight_layout=True)
-        for frame in range(self.num_events-1):
+        for frame in tqdm(range(self.num_events-1),ncols=100):
             imgplot0=plt.subplot2grid((5,2),(0,0),rowspan=4)
-            imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied[:,:,:]),vmax=np.max(total_difference_tied[:,:,:]))
+            imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied),vmax=np.max(total_difference_tied))
             imgplot0.set_xticks([])
             imgplot0.set_yticks([])
             imgplot1=plt.subplot2grid((5,2),(0,1),rowspan=4)
-            imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_full[:,:,:]),vmax=np.max(total_difference_tied[:,:,:]))
+            imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_full),vmax=np.max(total_difference_full))
             imgplot1.set_xticks([])
             imgplot1.set_yticks([])
             imgplot2=plt.subplot2grid((5,2),(4,0))
@@ -728,13 +729,14 @@ class Graphing():
             imgplot3.set_xlim(0,self.num_events)
             imgplot3.set_ylim(0,max(avg_difference_full))
 
-            fig.savefig('figures/tmp/converge'+str(frame)+'.png',bbox_inches='tight',pad_inches=0,dpi=400)
+            #  fig.savefig('figures/tmp/converge'+str(frame)+'.png',bbox_inches='tight',pad_inches=0,dpi=400)
+            fig.savefig('figures/tmp/converge'+str(frame)+'.png',bbox_inches='tight',pad_inches=0)
             #  plt.pause(0.2)
         fig.clear()
         plt.close()
         fig,ax=plt.subplots(figsize=(10,15),tight_layout=True)
         images=[]
-        for k in range(1,self.num_events-1):
+        for k in tqdm(range(1,self.num_events-1),ncols=100):
             fname='figures/tmp/converge%d.png' % k
             img=mgimg.imread(fname)
             imgplot=plt.imshow(img)
@@ -867,4 +869,4 @@ if __name__ == '__main__':
             true_tar,pred_tar,param_tied_sim.real_obs,param_tied_sim.pred_obs,correct_percent,
             correct_percent_ml,correct,pred_percent,all_theta2_tied,all_theta2_full,param_tied_sim.theta2_correct,
             theta2_samples,param_tied_sim.X_samples)
-    plt.show()
+    #  plt.show()
