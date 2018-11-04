@@ -13,6 +13,7 @@ import os
 import itertools
 import warnings
 import time
+import yaml
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_recall_curve
@@ -21,6 +22,7 @@ np.set_printoptions(precision=2)
 from data_sim.DynamicsProfiles import *
 from HMM.hmm_classification import HMM_Classification
 from gaussianMixtures import GM
+from graphing import Graphing
 
 warnings.filterwarnings("ignore",category=RuntimeWarning)
 warnings.filterwarnings("ignore",category=UserWarning)
@@ -94,14 +96,18 @@ class Human():
         table_real+=np.random.uniform(-1,1,(num_tar,2*num_tar,2*num_tar))
         table_real[table_real<0]=0.1
         self.theta2_correct=np.zeros((2*num_tar*num_tar,2*num_tar))
+        #  self.table_compare=np.zeros((2*num_tar*num_tar,2*num_tar))
         for X in range(num_tar):
             for prev_obs in range(2*num_tar):
                 self.theta2_correct[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=table_real[X,prev_obs,:])
+                #  self.table_compare[X*2*num_tar+prev_obs,:]=table_real[X,prev_obs,:]
 
     def HumanObservations(self,num_tar,real_target,obs):
         if len(obs)>0:
             prev_obs=obs[-1]
             obs.append(np.random.choice(range(2*num_tar),p=self.theta2_correct[real_target*2*num_tar+prev_obs,:]))
+            #DEBUG
+            #  print real_target
         else:
             obs_type=np.random.choice(range(4),p=self.theta1)
             #tp
@@ -175,108 +181,115 @@ class DataFusion(Human):
             self.probs[i]/=suma
 
     def sampling_full(self,num_tar,obs):
-        # initialize Dir sample
-        sample_check=[]
-        theta2_static=np.empty((2*num_tar*num_tar,2*num_tar))
         postX=copy.deepcopy(self.probs)
-        all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
-        all_theta2=np.zeros((int((self.num_samples-self.burn_in)/5),2*num_tar*num_tar,2*num_tar))
-        for X in range(num_tar):
-            for prev_obs in range(2*num_tar):
-                theta2_static[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
+        # only learning theta2 on 2+ observations
+        if len(obs)>1:
+            # initialize Dir sample
+            sample_check=[]
+            theta2_static=np.empty((2*num_tar*num_tar,2*num_tar))
+            all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
+            self.all_theta2=np.zeros((int((self.num_samples-self.burn_in)/5),2*num_tar*num_tar,2*num_tar))
+            for X in range(num_tar):
+                for prev_obs in range(2*num_tar):
+                    theta2_static[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
 
-        # begin gibbs sampling
-        theta2=copy.deepcopy(theta2_static)
-        for n in range(self.num_samples):
-            # calc X as if we knew theta2
+            # begin gibbs sampling
+            theta2=copy.deepcopy(theta2_static)
+            for n in range(self.num_samples):
+                # calc X as if we knew theta2
+                for i in self.names:
+                    # likelihood from theta1 (not full dist, assuming we know theta1)
+                    index=self.select_param(self.names.index(i),obs[0])
+                    likelihood=self.theta1[index]
+                    # likelihood from theta2
+                    for value in obs[1:]:
+                        likelihood*=theta2[self.names.index(i)*2*num_tar+obs[obs.index(value)-1],value]
+                    postX[i]=self.probs[i]*likelihood
+                # normalize
+                suma=sum(postX.values())
+                for i in self.names:
+                    postX[i]=np.log(postX[i])-np.log(suma) 
+                    postX[i]=np.exp(postX[i])
+                # store every 5th sample
+                if n%5==0:
+                    all_post[int((n-self.burn_in)/5),:,:]=postX.values()
+                # sample from X
+                X=np.random.choice(range(num_tar),p=postX.values())
+                alphas=copy.deepcopy(self.theta2_full)
+                theta2=copy.deepcopy(theta2_static)
+                # calc theta2 as if we knew X
+                for i in range(len(obs)-1):
+                    alphas[X,obs[i],obs[i+1]]+=1
+                for j in range(theta2.shape[1]):
+                    theta2[X*2*num_tar+j,:]=np.random.dirichlet(alphas[X,j,:])
+                if n%5==0:
+                    self.all_theta2[int((n-self.burn_in)/5),:,:]=theta2
+
+
+            # take max likelihood of X for next obs
+            post_probs=np.mean(all_post,axis=0)
+            return post_probs[0]
+
+        # using only theat1 on first observation
+        else:
             for i in self.names:
                 # likelihood from theta1 (not full dist, assuming we know theta1)
                 index=self.select_param(self.names.index(i),obs[0])
-                if index%2==0:
-                    likelihood=self.theta1[index]
-                else:
-                    likelihood=(self.theta1[index]/(num_tar-1))
-                # likelihood from theta2
-                if len(obs)>1:
-                    for value in obs[1:]:
-                        likelihood*=theta2[self.names.index(i)*2*num_tar+obs[obs.index(value)-1],value]
-                #  print likelihood
+                likelihood=self.theta1[index]
                 postX[i]=self.probs[i]*likelihood
-            # normalize
+            # normalize and set final values
             suma=sum(postX.values())
             for i in self.names:
                 postX[i]=np.log(postX[i])-np.log(suma) 
                 postX[i]=np.exp(postX[i])
-            # store every 5th sample
-            if n%5==0:
-                all_post[int((n-self.burn_in)/5),:,:]=postX.values()
-            # sample from X
-            X=np.random.choice(range(num_tar),p=postX.values())
-            alphas=copy.deepcopy(self.theta2_full)
-            theta2=copy.deepcopy(theta2_static)
-            # calc theta2 as if we knew X
-            if len(obs)>1:
-                alphas[X,obs[-2],obs[-1]]+=1
-                theta2[X*2*num_tar+obs[-2],:]=np.random.dirichlet(alphas[X,obs[-2],:])
-                if n%5==0:
-                    all_theta2[int((n-self.burn_in)/5),X*2*num_tar+obs[-2],:]=theta2[X*2*num_tar+obs[-2],:]
+            return postX.values()
 
+    def moment_matching_full(self):
         # moment matching of alphas from samples (Minka, 2000)
-        if len(obs)>1:
-            sample_counts=np.zeros((2*num_tar*num_tar,2*num_tar))
-            for n in range(all_theta2.shape[1]):
-                pk_top_list=[]
-                sum_alpha=sum(self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),:])
-                for k in range(all_theta2.shape[2]):
-                    samples=all_theta2[np.nonzero(all_theta2[:,n,k]),n,k]
-                    if len(samples[0])==0:
-                        pass
-                    else:
-                        sample_counts[n,k]=len(samples[0])
-                        pk_top_list.append(np.mean(samples[0]))
-                        current_alpha=self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]
-                        for x in range(5):
-                            sum_alpha_old=sum_alpha-current_alpha+self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]
-                            logpk=np.sum(np.log(samples[0]))/len(samples[0])
-                            y=psi(sum_alpha_old)+logpk
-                            if y>=-2.22:
-                                alphak=np.exp(y)+0.5
-                            else:
-                                alphak=-1/(y+psi(1))
-                            #  print "start:",alphak
-                            for w in range(5):
-                                alphak-=((psi(alphak)-y)/polygamma(1,alphak))
-                            self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]=alphak
-
-        # take max likelihood of X for next obs
-        post_probs=np.mean(all_post,axis=0)
-        for i in self.names:
-            self.probs[i]=post_probs[0][self.names.index(i)]
+        sample_counts=np.zeros((2*num_tar*num_tar,2*num_tar))
+        for n in range(self.all_theta2.shape[1]):
+            sum_alpha=sum(self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),:])
+            for k in range(self.all_theta2.shape[2]):
+                samples=self.all_theta2[:,n,k]
+                if len(samples)==0:
+                    pass
+                else:
+                    sample_counts[n,k]=len(samples)
+                    current_alpha=self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]
+                    for x in range(5):
+                        sum_alpha_old=sum_alpha-current_alpha+self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]
+                        logpk=np.sum(np.log(samples))/len(samples)
+                        y=psi(sum_alpha_old)+logpk
+                        if y>=-2.22:
+                            alphak=np.exp(y)+0.5
+                        else:
+                            alphak=-1/(y+psi(1))
+                        for w in range(5):
+                            alphak-=((psi(alphak)-y)/polygamma(1,alphak))
+                        self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]=alphak
 
 
     def sampling_param_tied(self,num_tar,obs):
-        # initialize Dir sample
-        sample_check=[]
         postX=copy.deepcopy(self.probs)
-        theta2_static=np.empty((4,4))
-        all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
-        theta2_samples=np.zeros((int((self.num_samples-self.burn_in)/5),4,4))
-        for i in range(4):
-            theta2_static[i,:]=scipy.stats.dirichlet.mean(alpha=self.theta2[i,:])
+        # only learning theta2 on 2+ observations
+        if len(obs)>1:
+            # initialize Dir sample
+            sample_check=[]
+            theta2_static=np.empty((4,4))
+            all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
+            self.theta2_samples=np.zeros((int((self.num_samples-self.burn_in)/5),4,4))
+            for i in range(4):
+                theta2_static[i,:]=scipy.stats.dirichlet.mean(alpha=self.theta2[i,:])
 
-        # begin gibbs sampling
-        theta2=copy.deepcopy(theta2_static)
-        for n in range(self.num_samples):
-            # calc X as if we knew theta2
-            for i in self.names:
-                # lieklihood from theta1
-                index=self.select_param(self.names.index(i),obs[0])
-                if index%2==0:
+            # begin gibbs sampling
+            theta2=copy.deepcopy(theta2_static)
+            for n in range(self.num_samples):
+                # calc X as if we knew theta2
+                for i in self.names:
+                    # lieklihood from theta1
+                    index=self.select_param(self.names.index(i),obs[0])
                     likelihood=self.theta1[index]
-                else:
-                    likelihood=(self.theta1[index]/(num_tar-1))
-                # likelihood from theta2
-                if len(obs)>1:
+                    # likelihood from theta2
                     count=0
                     for value in obs[1:]:
                         indicies=self.select_param(self.names.index(i),value,obs[count])
@@ -285,65 +298,91 @@ class DataFusion(Human):
                         else:
                             likelihood*=(theta2[indicies[0],indicies[1]]/(num_tar-1))
                         count+=1
-                #  print likelihood
+                    postX[i]=self.probs[i]*likelihood
+                # normalize
+                suma=sum(postX.values())
+                for i in self.names:
+                    postX[i]=np.log(postX[i])-np.log(suma) 
+                    postX[i]=np.exp(postX[i])
+                # store every 5th sample
+                if n%5==0:
+                    all_post[int((n-self.burn_in)/5),:,:]=postX.values()
+                # sample from X
+                X=np.random.choice(range(num_tar),p=postX.values())
+                alphas=copy.deepcopy(self.theta2)
+                theta2=copy.deepcopy(theta2_static)
+                # calc theta2 as is we knew X
+                for i in range(len(obs)-1):
+                    indicies=self.select_param(X,obs[i+1],obs[i])
+                    #DEBUG
+                    #  if (n==500):
+                    #      print X,obs[i+1],obs[i],indicies
+                    #      print alphas
+                    alphas[indicies[0],indicies[1]]+=1
+                    #  if (n==500):
+                    #      print alphas
+                for j in range(4):
+                    theta2[j,:]=np.random.dirichlet(alphas[j,:])
+                if n%5==0:
+                    self.theta2_samples[int((n-self.burn_in)/5),:,:]=theta2
+
+            # storing data for graphs
+            if max(postX.values())<0.5:
+                self.X_samples=all_post
+
+            # take max likelihood of X for next obs
+            post_probs=np.mean(all_post,axis=0)
+            #DEBUG
+            #  print obs
+            #  print post_probs[0]
+            return post_probs[0]
+
+        # using only theat1 on first observation
+        else:
+            for i in self.names:
+                # likelihood from theta1 (not full dist, assuming we know theta1)
+                index=self.select_param(self.names.index(i),obs[0])
+                likelihood=self.theta1[index]
                 postX[i]=self.probs[i]*likelihood
-            # normalize
+            # normalize and set final values
             suma=sum(postX.values())
             for i in self.names:
                 postX[i]=np.log(postX[i])-np.log(suma) 
                 postX[i]=np.exp(postX[i])
-            # store every 5th sample
-            if n%5==0:
-                all_post[int((n-self.burn_in)/5),:,:]=postX.values()
-            # sample from X
-            X=np.random.choice(range(num_tar),p=postX.values())
-            alphas=copy.deepcopy(self.theta2)
-            theta2=copy.deepcopy(theta2_static)
-            # calc theta2 as is we knew X
-            if len(obs)>1:
-                indicies=self.select_param(X,obs[-1],obs[-2])
-                alphas[indicies[0],indicies[1]]+=1
-                theta2[indicies[0],:]=np.random.dirichlet(alphas[indicies[0],:])
-                if n%5==0:
-                    theta2_samples[int((n-self.burn_in)/5),indicies[0],:]=theta2[indicies[0],:]
+            return postX.values()
 
-        # storing data for graphs
-        if self.sampling_data:
-            self.theta2_samples=theta2_samples
-        if max(postX.values())<0.5:
-            self.X_samples=all_post
-
+    def moment_matching(self,graph=False):
         # moment matching of alphas from samples (Minka, 2000)
-        if len(obs)>1:
-            sample_counts=np.zeros((4,4))
-            for n in range(4):
-                pk_top_list=[]
-                sum_alpha=sum(self.theta2[n,:])
-                for k in range(4):
-                    samples=theta2_samples[np.nonzero(theta2_samples[:,n,k]),n,k]
-                    if len(samples[0])==0:
-                        pass
-                    else:
-                        sample_counts[n,k]=len(samples[0])
-                        pk_top_list.append(np.mean(samples[0]))
-                        current_alpha=self.theta2[n,k]
-                        for x in range(5):
-                            sum_alpha_old=sum_alpha-current_alpha+self.theta2[n,k]
-                            logpk=np.sum(np.log(samples[0]))/len(samples[0])
-                            y=psi(sum_alpha_old)+logpk
-                            if y>=-2.22:
-                                alphak=np.exp(y)+0.5
-                            else:
-                                alphak=-1/(y+psi(1))
-                            #  print "start:",alphak
-                            for w in range(5):
-                                alphak-=((psi(alphak)-y)/polygamma(1,alphak))
-                            self.theta2[n,k]=alphak
-
-        # take max likelihood of X for next obs
-        post_probs=np.mean(all_post,axis=0)
-        for i in self.names:
-            self.probs[i]=post_probs[0][self.names.index(i)]
+        sample_counts=np.zeros((4,4))
+        for n in range(4):
+            sum_alpha=sum(self.theta2[n,:])
+            for k in range(4):
+                samples=self.theta2_samples[:,n,k]
+                if len(samples)==0:
+                    pass
+                else:
+                    sample_counts[n,k]=len(samples)
+                    current_alpha=self.theta2[n,k]
+                    for x in range(5):
+                        sum_alpha_old=sum_alpha-current_alpha+self.theta2[n,k]
+                        logpk=np.sum(np.log(samples))/len(samples)
+                        y=psi(sum_alpha_old)+logpk
+                        if y>=-2.22:
+                            alphak=np.exp(y)+0.5
+                        else:
+                            alphak=-1/(y+psi(1))
+                        for w in range(5):
+                            alphak-=((psi(alphak)-y)/polygamma(1,alphak))
+                        self.theta2[n,k]=alphak
+                    #DEBUG
+                    if graph:
+                        if (n==1) and (k==0):
+                            plt.figure()
+                            plt.hist(samples,bins=20,density=True)
+                            x=np.linspace(0,1)
+                            plt.plot(x,scipy.stats.beta.pdf(x,alphak,sum(self.theta2[n,:])-alphak))
+                            plt.show()
+                            #  sys.exit()
 
     def select_param(self,target,current_obs,prev_obs=None):
         # translate an observation about a target into its type of obs
@@ -369,515 +408,259 @@ class DataFusion(Human):
             index=select_index(target,current_obs)
             return index
 
-
-class Graphing():
-    def __init__(self,num_events,num_tar,alphas_start,theta2,true_tar,pred_tar,real_obs,pred_obs,
-            correct_percent,correct_percent_ml,correct,pred_percent,all_theta2_tied,all_theta2_full,
-            theta2_correct,theta2_samples,X_samples):
-        self.num_events=num_events
-        self.num_tar=num_tar
-        self.alphas_start=alphas_start
-        self.theta2=theta2
-        self.true_tar=true_tar
-        self.pred_tar=pred_tar
-        self.real_obs=real_obs
-        self.pred_obs=pred_obs
-        self.correct_percent=correct_percent
-        self.correct_percent_ml=correct_percent_ml
-        self.correct=correct
-        self.pred_percent=pred_percent
-        self.all_theta2_tied=all_theta2_tied
-        self.all_theta2_full=all_theta2_full
-        self.theta2_correct=theta2_correct
-        self.theta2_samples=theta2_samples
-        self.X_samples=X_samples
-
-        self.gif_time=10 #seconds
-
-        print "Making Theta Validation Plots"
-        self.theta_validation()
-        print "Making Gibbs Validation Plots"
-        self.gibbs_validation()
-        print "Making Experiment Results Plot"
-        self.experimental_results()
-        print "Making Theta2 Validation GIF"
-        self.human_validation()
-        print "Making Convergence GIF"
-        self.convergence_validation()
-
-
-    def build_theta2(self,num_tar,alphas):
-        # make full theta2 table from param tied table
-        def select_index(tar,obs):
-            if tar*2==obs:
-                #tp
-                index=0
-            elif obs%2==0:
-                #fp
-                index=1
-            if tar*2+1==obs:
-                #fn
-                index=2
-            elif obs%2==1:
-                #tn
-                index=3
-            return index
-        theta2=np.empty((2*num_tar*num_tar,num_tar*2))
-        for i in range(theta2.shape[0]):
-            index1=select_index(int(i/(2*num_tar)),i%(2*num_tar))
-            for j in range(theta2.shape[1]):
-                index2=select_index(int(i/(2*num_tar)),j%(2*num_tar))
-                theta2[i,j]=alphas[index1,index2]
-        return theta2
-
-    def KLD(self,mean_i,mean_j,var_i,var_j):
-        dist=.5*((var_i**2/var_j**2)+var_j**2*(mean_j-mean_i)**2-1+np.log(var_j**2/var_i**2))
-        return np.absolute(dist)
-
-    def lagk_correlation(self,data):
-        "https://www.itl.nist.gov/div898/handbook/eda/section3/eda35c.htm"
-        rhok=np.empty(len(data))
-        mean=np.mean(data)
-        for k in range(len(data)):
-            n=len(data)
-            numerator=0
-            for i in range(n-k):
-                numerator+=(data[i]-mean)*(data[i+k]-mean)
-            denominator=0
-            for i in range(n):
-                denominator+=(data[i]-mean)**2
-            rhok[k]=(numerator/denominator)
-        return rhok
-
-    def theta_validation(self):
-        # need to make a dynamic sized list for all 16 params
-        # there are a different number of parameters for each type
-        breakdown=[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
-
-        # assigning the theta2_correct table to tp,fp,fn,tn values
-        for i in range(self.theta2_correct.shape[0]):
-            if 2*int(i/(2*self.num_tar))==i%(2*self.num_tar):
-                index1=0 #tp
-            elif i%2==0:
-                index1=2 #fp
-            if 2*int(i/(2*self.num_tar))+1==i%(2*self.num_tar):
-                index1=1 #fn
-            elif i%2==1:
-                index1=3 #tn
-
-            for j in range(self.theta2_correct.shape[1]):
-                if 2*int(i/(2*self.num_tar))==j:
-                    index2=0
-                elif j%2==0:
-                    index2=2
-                if 2*int(i/(2*self.num_tar))+1==j:
-                    index2=1
-                elif j%2==1:
-                    index2=3
-
-                if (index2==2) or (index2==3):
-                    breakdown[index1*4+index2].append((self.num_tar-1)*self.theta2_correct[i,j])
-                else:
-                    breakdown[index1*4+index2].append(self.theta2_correct[i,j])
-
-        # maginalizing out dimentions of dirichlet into beta functions
-        alpha_beta_start=np.empty((4,4,2))
-        alpha_beta_est=np.empty((4,4,2))
-        for i in range(4):
-            for j in range(4):
-                alpha_beta_start[i,j,:]=[self.alphas_start[i,j],sum(self.alphas_start[i,:])-self.alphas_start[i,j]]
-                alpha_beta_est[i,j,:]=[self.theta2[i,j],sum(self.theta2[i,:])-self.theta2[i,j]]
-
-        strings=['TP','FP','FN','TN']
-        fig,ax=plt.subplots(nrows=4,ncols=4,figsize=((15,15)),tight_layout=True)
-        #  fig.suptitle(r'Starting $p(\theta_2)$, Estimated $p(\theta_2)$, and True $\theta_2$',fontweight='bold')
-        x=np.linspace(0,1)
-        for i in range(4):
-            for j in range(4):
-                ax[i,j].plot(x,scipy.stats.beta.pdf(x,alpha_beta_start[i,j,0],alpha_beta_start[i,j,1]),label=r"Starting $p(\theta_2)$")
-                ax[i,j].plot(x,scipy.stats.beta.pdf(x,alpha_beta_est[i,j,0],alpha_beta_est[i,j,1]),label=r"Estimated $p(\theta_2)$")
-                ax[i,j].scatter(breakdown[i*4+j],len(breakdown[i*4+j])*[0],label=r'$\theta$')
-                ax[i,j].set_xlabel(r'$\theta_2$')
-                ax[i,j].set_ylabel('PDF')
-                ax[i,j].set_title(strings[i]+', '+strings[j],fontweight='bold')
-                ax[i,j].legend()
-        fig.savefig('figures/theta_validation.png',bbox_inches='tight',pad_inches=0)
-
-    def gibbs_validation(self):
-        for i in range(16):
-            if len(self.theta2_samples[i])==0:
-                print "At least one case produced no samples, must have samples for gibbs graph"
-                return
-        strings=['TP','FP','FN','TN']
-        colors=['g','y','r','c']
-        #  colors=[['#00ff00','#00ad00','#007a00','#00de00'],['#ffff00','#b3b300','#858500','#dada00'],
-        #          ['#ff0000','#9e0000','#770000','#d80000'],['#0000ff','#00009c','#00005d','#0000d8']]
-        fig1=plt.figure(figsize=(18,12),tight_layout=True)
-        fig1.suptitle(r'Signal, Histogram, and Autocorrelation of Gibbs Samples ($\theta_2$)',fontweight='bold')
-        for i in tqdm(range(4),ncols=100):
-            for j in range(4):
-                ax0=plt.subplot2grid((9,12),(2*i+1,3*j),colspan=2)
-                ax0.plot(range(len(self.theta2_samples[4*i+j])),self.theta2_samples[4*i+j],color=colors[i])
-                ax0.set_ylim((0,1))
-                ax0.set_title(strings[i]+', '+strings[j],fontweight='bold',loc='right')
-                ax0.set_xlabel('Sample #')
-                ax0.set_ylabel(r'$\theta_2$')
-                ax1=plt.subplot2grid((9,12),(2*i+1,3*j+2))
-                ax1.hist(self.theta2_samples[4*i+j],bins=20,range=(0,1),color=colors[i])
-                ax1.set_xlabel(r'$\theta_2$')
-                ax1.set_ylabel('Frequency')
-                ax2=plt.subplot2grid((9,12),(2*i+2,3*j),colspan=3)
-                corr=self.lagk_correlation(self.theta2_samples[4*i+j])
-                ax2.plot(range(len(corr)),corr,color=colors[i])
-                ax2.set_xlabel('Lag')
-                ax2.set_ylabel(r'$\rho$')
-        fig2=plt.figure(figsize=(16,12),tight_layout=True)
-        fig2.suptitle('Signal, Histogram, and Autocorrelation of Gibbs Samples (X)',fontweight='bold')
-        for i in tqdm(range(self.num_tar),ncols=100):
-            ax0=plt.subplot2grid((2*(int(self.num_tar/2)+self.num_tar%2)+1,6),(2*int(i/2)+1,3*(i%2)),colspan=2)
-            ax0.plot(range(len(self.X_samples[:,:,i])),self.X_samples[:,:,i])
-            ax0.set_ylim((0,1))
-            ax0.set_title('X='+str(i),fontweight='bold',loc='right')
-            ax0.set_xlabel('Sample #')
-            ax0.set_ylabel('X')
-            ax1=plt.subplot2grid((2*(int(self.num_tar/2)+self.num_tar%2)+1,6),(2*int(i/2)+1,3*(i%2)+2))
-            ax1.hist(self.X_samples[:,:,i],bins=20,range=(0,1))
-            ax1.set_xlabel('X')
-            ax1.set_ylabel('Frequency')
-            ax2=plt.subplot2grid((2*(int(self.num_tar/2)+self.num_tar%2)+1,6),(2*int(i/2)+2,3*(i%2)),colspan=3)
-            corr=self.lagk_correlation(self.X_samples[:,:,i])
-            ax2.plot(range(len(corr)),corr)
-            ax2.set_xlabel('Lag')
-            ax2.set_ylabel(r'$\rho$')
-        fig1.savefig('figures/gibbs_validation_theta.png',bbox_inches='tight',pad_inches=0)
-        fig2.savefig('figures/gibbs_validation_X.png',bbox_inches='tight',pad_inches=0)
-
-    def experimental_results(self):
-        fig=plt.figure(figsize=(12,9))
-        plt.subplot(221)
-        cm=confusion_matrix(self.true_tar,self.pred_tar)
-        cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        plt.imshow(cm,cmap='Blues')
-        plt.ylabel('True Label')
-        plt.xlabel('Given Label')
-        plt.title('Target Classification Confusion Matrix')
-        for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
-
-        plt.subplot(222)
-        cm=confusion_matrix(self.real_obs,self.pred_obs)
-        cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        plt.imshow(cm,cmap='Blues')
-        plt.ylabel('True Value')
-        plt.xlabel('Given Obs')
-        plt.title('Human Observations Confusion Matrix')
-        plt.xticks([0,1],['pos','neg'])
-        plt.yticks([0,1],['pos','neg'])
-        for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
-
-        plt.subplot(223)
-        plt.plot([n+5 for n in range(self.num_events-5)],self.correct_percent[5:], label="w/Human Total Correct")
-        plt.plot([n+5 for n in range(self.num_events-5)],self.correct_percent_ml[5:], label="wo/Human Total Correct")
-        plt.legend()
-        plt.xlabel('Number of Targets')
-        plt.ylabel('Percent Correct')
-        plt.title('Correct Classification')
-
-        plt.subplot(224)
-        precision, recall, _ =precision_recall_curve(self.correct,self.pred_percent)
-        plt.step(recall,precision,where='post')
-        plt.xlim([0.0,1.0])
-        plt.ylim([0.0,1.0])
-        plt.xlabel('Recall')
-        plt.ylabel('Precission')
-        plt.title('Precision Recall Curve')
-
-        fig.savefig('figures/experimental_results.png',bbox_inches='tight',pad_inches=0)
-
-    def human_validation(self):
-        total_difference_tied=np.empty([self.num_events,2*num_tar*num_tar,2*num_tar])
-        total_difference_full=np.empty([self.num_events,2*num_tar*num_tar,2*num_tar])
-        avg_difference_tied=np.empty((self.num_events))
-        avg_difference_full=np.empty((self.num_events))
-        for n in tqdm(range(self.num_events),ncols=100):
-            theta2_tied=self.build_theta2(self.num_tar,self.all_theta2_tied[n,:,:])
-
-            theta_real_mean=np.empty((2*num_tar*num_tar,2*num_tar))
-            theta_real_var=np.empty((2*num_tar*num_tar,2*num_tar))
-            theta_tied_mean=np.empty((2*num_tar*num_tar,2*num_tar))
-            theta_tied_var=np.empty((2*num_tar*num_tar,2*num_tar))
-            theta_full_mean=np.empty((2*num_tar*num_tar,2*num_tar))
-            theta_full_var=np.empty((2*num_tar*num_tar,2*num_tar))
-            for X in range(num_tar):
-                for prev_obs in range(2*num_tar):
-                    theta_real_mean[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_correct[X*2*num_tar+prev_obs,:])
-                    theta_real_var[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=self.theta2_correct[X*2*num_tar+prev_obs,:])
-                    theta_tied_mean[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=theta2_tied[X*2*num_tar+prev_obs,:])
-                    theta_tied_var[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=theta2_tied[X*2*num_tar+prev_obs,:])
-                    theta_full_mean[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
-                    theta_full_var[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
-            for i in range(total_difference_tied.shape[1]):
-                for j in range(total_difference_tied.shape[2]):
-                    total_difference_tied[n,i,j]=self.KLD(theta_real_mean[i,j],theta_tied_mean[i,j],theta_real_var[i,j],theta_tied_var[i,j])
-                    total_difference_full[n,i,j]=self.KLD(theta_real_mean[i,j],theta_full_mean[i,j],theta_real_var[i,j],theta_full_var[i,j])
-            one_dim_tied=np.reshape(theta_tied_mean,(1,4*num_tar**3))
-            one_dim_full=np.reshape(theta_full_mean,(1,4*num_tar**3))
-            one_dim_correct=np.reshape(self.theta2_correct,(1,4*num_tar**3))
-            avg_difference_tied[n]=scipy.stats.entropy(one_dim_tied[0],one_dim_correct[0])
-            avg_difference_full[n]=scipy.stats.entropy(one_dim_full[0],one_dim_correct[0])
-
-        d=np.abs(total_difference_tied[1:,:,:]-np.median(total_difference_tied[1:,:,:]))
-        mdev=np.median(d)
-        vmax=2*mdev+np.median(total_difference_tied[1:,:,:])
-        fig=plt.figure(figsize=(10,15),tight_layout=True)
-        for frame in tqdm(range(self.num_events),ncols=100):
-            imgplot0=plt.subplot2grid((5,2),(0,0),rowspan=4)
-            im=imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied),vmax=vmax)
-            fig.colorbar(im,ax=imgplot0)
-            imgplot0.set_xticks([])
-            imgplot0.set_yticks([])
-            imgplot0.set_title('KLD all params (tied)')
-            imgplot1=plt.subplot2grid((5,2),(0,1),rowspan=4)
-            im2=imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_full),vmax=vmax)
-            fig.colorbar(im2,ax=imgplot1)
-            imgplot1.set_xticks([])
-            imgplot1.set_yticks([])
-            imgplot1.set_title('KLD all params (full)')
-            imgplot2=plt.subplot2grid((5,2),(4,0))
-            imgplot2.plot(np.linspace(0,frame,frame),avg_difference_tied[0:frame],'c')
-            imgplot2.set_xlabel('Number of Events')
-            imgplot2.set_ylabel(r'KLD of all $\theta$')
-            imgplot2.set_xlim(0,self.num_events)
-            imgplot2.set_ylim(0,max(avg_difference_tied))
-            imgplot3=plt.subplot2grid((5,2),(4,1))
-            imgplot3.plot(np.linspace(0,frame,frame),avg_difference_full[0:frame],'c')
-            imgplot3.set_xlabel('Number of Events')
-            imgplot3.set_ylabel(r'KLD of all $\theta$')
-            imgplot3.set_xlim(0,self.num_events)
-            imgplot3.set_ylim(0,max(avg_difference_full))
-
-            #  fig.savefig('figures/tmp/human'+str(frame)+'.png',bbox_inches='tight',pad_inches=0,dpi=400)
-            fig.savefig('figures/tmp/human'+str(frame)+'.png',bbox_inches='tight',pad_inches=0)
-            #  plt.pause(0.2)
-        fig.clear()
-        plt.close()
-        fig,ax=plt.subplots(figsize=(10,15),tight_layout=True)
-        images=[]
-        for k in tqdm(range(1,self.num_events),ncols=100):
-            fname='figures/tmp/human%d.png' % k
-            img=mgimg.imread(fname)
-            imgplot=plt.imshow(img)
-            plt.axis('off')
-            images.append([imgplot])
-        ani=animation.ArtistAnimation(fig,images)
-        ani.save("figures/human_validation.gif",fps=self.num_events/self.gif_time)
-        fig.clear()
-        plt.close()
-            #  plt.xlabel('%d Targets' % (int(num_tar/10)*i))
-        #  cax=plt.axes([0.93,0.25,0.025,0.5])
-        #  plt.colorbar(cax=cax)
-
-    def convergence_validation(self):
-        total_difference_tied=np.empty([self.num_events-1,4,4])
-        total_difference_full=np.empty([self.num_events-1,2*num_tar*num_tar,2*num_tar])
-        avg_difference_tied=np.empty((self.num_events-1))
-        avg_difference_full=np.empty((self.num_events-1))
-        theta_tied_mean=np.empty((self.num_events,4,4))
-        theta_tied_var=np.empty((self.num_events,4,4))
-        theta_full_mean=np.empty((self.num_events,2*num_tar*num_tar,2*num_tar))
-        theta_full_var=np.empty((self.num_events,2*num_tar*num_tar,2*num_tar))
-        for n in tqdm(range(self.num_events),ncols=100):
-            for X in range(num_tar):
-                for prev_obs in range(2*num_tar):
-                    theta_full_mean[n,X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
-                    theta_full_var[n,X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.var(alpha=self.all_theta2_full[n,X*2*num_tar+prev_obs,:])
-            for i in range(4):
-                theta_tied_mean[n,i,:]=scipy.stats.dirichlet.mean(alpha=self.all_theta2_tied[n,i,:])
-                theta_tied_var[n,i,:]=scipy.stats.dirichlet.var(alpha=self.all_theta2_tied[n,i,:])
-        for n in range(self.num_events)[1:]:
-            for i in range(total_difference_tied.shape[1]):
-                for j in range(total_difference_tied.shape[2]):
-                    total_difference_tied[n-1,i,j]=self.KLD(theta_tied_mean[n,i,j],theta_tied_mean[n-1,i,j],theta_tied_var[n,i,j],theta_tied_var[n-1,i,j])
-            for i in range(total_difference_full.shape[1]):
-                for j in range(total_difference_full.shape[2]):
-                    total_difference_full[n-1,i,j]=self.KLD(theta_full_mean[n,i,j],theta_full_mean[n-1,i,j],theta_full_var[n,i,j],theta_full_var[n-1,i,j])
-
-            one_dim_tied_old=np.reshape(theta_tied_mean[n-1],(1,16))
-            one_dim_tied=np.reshape(theta_tied_mean[n],(1,16))
-            one_dim_full_old=np.reshape(theta_full_mean[n-1],(1,4*num_tar**3))
-            one_dim_full=np.reshape(theta_full_mean[n],(1,4*num_tar**3))
-            avg_difference_tied[n-1]=scipy.stats.entropy(one_dim_tied_old[0],one_dim_tied[0])
-            avg_difference_full[n-1]=scipy.stats.entropy(one_dim_full_old[0],one_dim_full[0])
-
-        #  d=np.abs(total_difference_tied[1:,:,:]-np.median(total_difference_tied[1:,:,:]))
-        #  mdev=np.median(d)
-        #  vmax=2*mdev+np.median(total_difference_tied[1:,:,:])
-        fig=plt.figure(figsize=(10,15),tight_layout=True)
-        for frame in tqdm(range(self.num_events-1),ncols=100):
-            imgplot0=plt.subplot2grid((5,2),(0,0),rowspan=4)
-            im=imgplot0.imshow(total_difference_tied[frame],cmap='hot',vmin=np.min(total_difference_tied),vmax=np.max(total_difference_tied))
-            fig.colorbar(im,ax=imgplot0)
-            imgplot0.set_xticks([])
-            imgplot0.set_yticks([])
-            imgplot0.set_title('KLD between events (tied)')
-            imgplot1=plt.subplot2grid((5,2),(0,1),rowspan=4)
-            im2=imgplot1.imshow(total_difference_full[frame],cmap='hot',vmin=np.min(total_difference_full),vmax=np.max(total_difference_full))
-            fig.colorbar(im2,ax=imgplot1)
-            imgplot1.set_xticks([])
-            imgplot1.set_yticks([])
-            imgplot1.set_title('KLD between events (full)')
-            imgplot2=plt.subplot2grid((5,2),(4,0))
-            imgplot2.plot(np.linspace(0,frame,frame),avg_difference_tied[0:frame],'c')
-            imgplot2.set_xlabel('Number of Events')
-            imgplot2.set_ylabel(r'KLD of all $\theta$')
-            imgplot2.set_xlim(0,self.num_events)
-            imgplot2.set_ylim(0,max(avg_difference_tied))
-            imgplot3=plt.subplot2grid((5,2),(4,1))
-            imgplot3.plot(np.linspace(0,frame,frame),avg_difference_full[0:frame],'c')
-            imgplot3.set_xlabel('Number of Events')
-            imgplot3.set_ylabel(r'KLD of all $\theta$')
-            imgplot3.set_xlim(0,self.num_events)
-            imgplot3.set_ylim(0,max(avg_difference_full))
-
-            #  fig.savefig('figures/tmp/converge'+str(frame)+'.png',bbox_inches='tight',pad_inches=0,dpi=400)
-            fig.savefig('figures/tmp/converge'+str(frame)+'.png',bbox_inches='tight',pad_inches=0)
-            #  plt.pause(0.2)
-        fig.clear()
-        plt.close()
-        fig,ax=plt.subplots(figsize=(10,15),tight_layout=True)
-        images=[]
-        for k in tqdm(range(1,self.num_events-1),ncols=100):
-            fname='figures/tmp/converge%d.png' % k
-            img=mgimg.imread(fname)
-            imgplot=plt.imshow(img)
-            plt.axis('off')
-            images.append([imgplot])
-        ani=animation.ArtistAnimation(fig,images)
-        ani.save("figures/convergence_validation.gif",fps=self.num_events/self.gif_time)
-        fig.clear()
-        plt.close()
-
-    def dependent_independent_compare(self):
-        pass
-
-    def accuracy_comparison(self):
-        # compare between independent and dependent
-        pass
-
+def load_config(path=None):
+    if not path:
+        path=os.path.dirname(__file__) + 'config.yaml'
+    try:
+        with open(path, 'r') as stream:
+            cfg=yaml.load(stream)
+    except IOError:
+        print "No config file found"
+        raise
+    return cfg
 
 if __name__ == '__main__':
     commands=[]
     for i in range(1,len(sys.argv)):
         commands.append(sys.argv[i])
     num_events=int(commands[0])
-    num_tar=5
 
+    cfg=load_config('config.yaml')
+    graph_params=cfg['graphs']
+    # checking the config choices
+    if not cfg['sim_types']['full_dir']:
+        if graph_params['sim_results_full']:
+            print "can't make the full sim results"
+            raise
+    if not cfg['sim_types']['param_tied_dir']:
+        if graph_params['sim_results_tied']:
+            print "can't make the tied sim results"
+            raise
+    if not cfg['sim_types']['param_tied_dir']:
+        if graph_params['gibbs_val']:
+            print "can't make gibbs graph"
+            raise
+    
     # initializing variables
+    num_tar=cfg['num_tar']
+    threshold=cfg['threshold']
 
-    # target confusion matrix
-    true_tar=[]
-    pred_tar=[]
-    # precision recall
-    pred_percent=[]
-    correct=[0]*num_events
-    # running average
-    correct_percent=[]
-    correct_ml=[0]*num_events
-    correct_percent_ml=[]
-    # human validation
-    all_theta2_tied=np.empty((num_events,4,4))
-    all_theta2_full=np.empty((num_events,2*num_tar*num_tar,2*num_tar))
-    # gibbs validations
-    theta2_samples=[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
+    if graph_params['sim_results_full']:
+        # target confusion matrix
+        true_tar_full=[]
+        pred_tar_full=[]
+        # precision recall
+        pred_percent_full=[]
+        correct_full=[0]*num_events
+        # running average
+        correct_percent_full=[]
+        correct_ml_full=[0]*num_events
+        correct_percent_ml_full=[]
+    else:
+        # target confusion matrix
+        true_tar_full=None
+        pred_tar_full=None
+        # precision recall
+        pred_percent_full=None
+        correct_full=None
+        # running average
+        correct_percent_full=None
+        correct_ml_full=None
+        correct_percent_ml_full=None
+    if graph_params['sim_results_tied']:
+        # target confusion matrix
+        true_tar_tied=[]
+        pred_tar_tied=[]
+        # precision recall
+        pred_percent_tied=[]
+        correct_tied=[0]*num_events
+        # running average
+        correct_percent_tied=[]
+        correct_ml_tied=[0]*num_events
+        correct_percent_ml_tied=[]
+    else:
+        # target confusion matrix
+        true_tar_tied=None
+        pred_tar_tied=None
+        # precision recall
+        pred_percent_tied=None
+        correct_tied=None
+        # running average
+        correct_percent_tied=None
+        correct_ml_tied=None
+        correct_percent_ml_tied=None
+    #  # human validation
+    #  all_theta2_tied=np.empty((num_events,4,4))
+    #  all_theta2_full=np.empty((num_events,2*num_tar*num_tar,2*num_tar))
+    if graph_params['gibbs_val']:
+        # gibbs validations
+        theta2_samples=[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
+    else:
+        theta2_samples=None
 
     # start sim
-    full_sim=DataFusion()
-    full_sim.DirPrior(num_tar)
-    param_tied_sim=DataFusion()
-    param_tied_sim.DirPrior(num_tar)
-    alphas_start=copy.deepcopy(param_tied_sim.theta2)
+    if cfg['sim_types']['full_dir']:
+        full_sim=DataFusion()
+        full_sim.DirPrior(num_tar)
+    if cfg['sim_types']['param_tied_dir']:
+        param_tied_sim=DataFusion()
+        param_tied_sim.DirPrior(num_tar)
+    if graph_params['theta_val']:
+        alphas_start=copy.deepcopy(param_tied_sim.theta2)
+    else:
+        alphas_start=None
+
+    #running sim
     for n in tqdm(range(num_events),ncols=100):
         # initialize target type
         genus=np.random.randint(num_tar)
         #  param_tied_sim.make_data(genus)
 
-        full_sim.probs={}
-        param_tied_sim.probs={}
-
         # getting a prior from ML
-        if commands[1]=='uniform':
-            for i in param_tied_sim.names:
-                full_sim.probs[i]=.2
-                param_tied_sim.probs[i]=.2
-            correct_ml[n]=np.random.choice([0,0,0,0,1],p=param_tied_sim.probs.values())
-            correct_percent_ml.append(sum(correct_ml)/(n+1))
-        elif commands[1]=='assist':
-            #  sim.frame=0
-            #  for i in sim.names:
-            #      sim.alphas[i]=[-1,-1]
-            for i in param_tied_sim.names:
-                if param_tied_sim.names.index(i)==genus:
-                    param_tied_sim.probs[i]=np.random.normal(.75,.25)
-                    full_sim.probs[i]=param_tied_sim.probs[i]
-                else:
-                    param_tied_sim.probs[i]=np.random.normal(.25,.25)
-                    full_sim.probs[i]=param_tied_sim.probs[i]
-                if param_tied_sim.probs[i]<0:
-                    param_tied_sim.probs[i]=0.01
-                if full_sim.probs[i]<0:
-                    full_sim.probs[i]=0.01
-            for i in param_tied_sim.names:
-                param_tied_sim.probs[i]/=sum(param_tied_sim.probs.values())
-            for i in full_sim.names:
-                full_sim.probs[i]/=sum(full_sim.probs.values())
+        if cfg['sim_types']['full_dir']:
+            full_sim.probs={}
+            if cfg['starting_dist']=='uniform':
+                for i in full_sim.names:
+                    full_sim.probs[i]=.2
+                if graph_params['sim_results_full']:
+                    correct_ml_full[n]=np.random.choice([0,0,0,0,1],p=full_sim.probs.values())
+                    correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
+            elif cfg['starting_dist']=='assist':
+                #  sim.frame=0
+                #  for i in sim.names:
+                #      sim.alphas[i]=[-1,-1]
+                for i in full_sim.names:
+                    if full_sim.names.index(i)==genus:
+                        full_sim.probs[i]=np.random.normal(.75,.25)
+                    else:
+                        full_sim.probs[i]=np.random.normal(.25,.25)
+                    if full_sim.probs[i]<0:
+                        full_sim.probs[i]=0.01
+                for i in full_sim.names:
+                    full_sim.probs[i]/=sum(full_sim.probs.values())
 
-            chosen_ml=max(param_tied_sim.probs.values())
-            if genus==param_tied_sim.probs.values().index(chosen_ml):
-                correct_ml[n]=1
-            correct_percent_ml.append(sum(correct_ml)/(n+1))
+                if graph_params['sim_results_full']:
+                    chosen_ml_full=max(full_sim.probs.values())
+                    if genus==full_sim.probs.values().index(chosen_ml_full):
+                        correct_ml_full[n]=1
+                    correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
 
+            full_sim_probs=full_sim.probs.values()
+            count_full=0
+
+        if cfg['sim_types']['param_tied_dir']:
+            param_tied_sim.probs={}
+            if cfg['starting_dist']=='uniform':
+                for i in param_tied_sim.names:
+                    param_tied_sim.probs[i]=.2
+                if graph_params['sim_results_tied']:
+                    correct_ml_tied[n]=np.random.choice([0,0,0,0,1],p=param_tied_sim.probs.values())
+                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+            elif cfg['starting_dist']=='assist':
+                #  sim.frame=0
+                #  for i in sim.names:
+                #      sim.alphas[i]=[-1,-1]
+                for i in param_tied_sim.names:
+                    if param_tied_sim.names.index(i)==genus:
+                        param_tied_sim.probs[i]=np.random.normal(.75,.25)
+                    else:
+                        param_tied_sim.probs[i]=np.random.normal(.25,.25)
+                    if param_tied_sim.probs[i]<0:
+                        param_tied_sim.probs[i]=0.01
+                for i in param_tied_sim.names:
+                    param_tied_sim.probs[i]/=sum(param_tied_sim.probs.values())
+
+                if graph_params['sim_results_tied']:
+                    chosen_ml_tied=max(param_tied_sim.probs.values())
+                    if genus==param_tied_sim.probs.values().index(chosen_ml_tied):
+                        correct_ml_tied[n]=1
+                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+
+            param_tied_sim_probs=param_tied_sim.probs.values()
+            count_tied=0
+
+        #  for i in range(sim.frame,sim.frame+10):
+        #      if i<100:
+        #          sim.updateProbsML()
+        #          sim.frame+=1
         obs=[]
-        while (max(full_sim.probs.values())<0.9) or (max(param_tied_sim.probs.values())<0.9):
-            #  for i in range(sim.frame,sim.frame+10):
-            #      if i<100:
-            #          sim.updateProbsML()
-            #          sim.frame+=1
-            #          print sim.probs
-            #  sys.exit()
-            obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
-            if max(full_sim.probs.values())<0.9:
-                full_sim.sampling_full(num_tar,obs)
-            if max(param_tied_sim.probs.values())<0.9:
-                param_tied_sim.sampling_param_tied(num_tar,obs)
+        if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir']:
+            while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold):
+                obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
+                if max(full_sim_probs)<threshold:
+                    full_sim_probs=full_sim.sampling_full(num_tar,obs)
+                    count_full+=1
+                if max(param_tied_sim_probs)<threshold:
+                    param_tied_sim_probs=param_tied_sim.sampling_param_tied(num_tar,obs)
+                    count_tied+=1
+            if count_full>1:
+                full_sim.moment_matching_full()
+            if count_tied>1:
+                param_tied_sim.moment_matching()
+        elif cfg['sim_types']['full_dir']:
+            while (max(full_sim_probs)<threshold):
+                obs=full_sim.HumanObservations(num_tar,genus,obs)
+                full_sim_probs=full_sim.sampling_full(num_tar,obs)
+                count_full+=1
+
+            if count_full>1:
+                full_sim.moment_matching_full()
+        elif cfg['sim_types']['param_tied_dir']:
+            while (max(param_tied_sim_probs)<threshold):
+                obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
+                param_tied_sim_probs=param_tied_sim.sampling_full(num_tar,obs)
+                count_tied+=1
+
+            if count_tied>1:
+                param_tied_sim.moment_matching()
 
             # need a run where all 16 have been sampled, keep storing until a run produces that
-            for i in range(4):
-                for j in range(4):
-                    samples=param_tied_sim.theta2_samples[np.nonzero(param_tied_sim.theta2_samples[:,i,j]),i,j]
-                    if len(samples[0])>len(theta2_samples[i*4+j]):
-                        theta2_samples[i*4+j]=samples[0]
-                        
+            if count_tied>1:
+                for i in range(4):
+                    for j in range(4):
+                        samples=param_tied_sim.theta2_samples[np.nonzero(param_tied_sim.theta2_samples[:,i,j]),i,j]
+                        if len(samples[0])>len(theta2_samples[i*4+j]):
+                            theta2_samples[i*4+j]=samples[0]
 
+        if graph_params['sim_results_full']:
+            # building graphing parameters
+            chosen=max(full_sim_probs)
+            pred_percent_full.append(chosen)
+            true_tar_full.append(genus)
+            pred_tar_full.append(np.argmax(full_sim_probs))
+            if genus==np.argmax(full_sim_probs):
+                correct_full[n]=1
+            correct_percent_full.append(sum(correct_full)/(n+1))
+        if graph_params['sim_results_tied']:
+            # building graphing parameters
+            chosen=max(param_tied_sim_probs)
+            pred_percent_tied.append(chosen)
+            true_tar_tied.append(genus)
+            pred_tar_tied.append(np.argmax(param_tied_sim_probs))
+            if genus==np.argmax(param_tied_sim_probs):
+                correct_tied[n]=1
+            correct_percent_tied.append(sum(correct_tied)/(n+1))
+        #  all_theta2_tied[n,:,:]=param_tied_sim.theta2
+        #  theta2_full_alphas=np.empty((2*num_tar*num_tar,2*num_tar))
+        #  for X in range(num_tar):
+        #      for prev_obs in range(2*num_tar):
+        #          theta2_full_alphas[X*2*num_tar+prev_obs,:]=full_sim.theta2_full[X,prev_obs,:]
+        #  all_theta2_full[n,:,:]=theta2_full_alphas
+    if graph_params['theta_val']:
+        theta2=param_tied_sim.theta2
+        theta2_correct=param_tied_sim.theta2_correct
+    if graph_params['gibbs_val']:
+        X_samples=param_tied_sim.X_samples
+    if graph_params['sim_results_full']:
+        real_obs=full_sim.real_obs
+        pred_obs=full_sim.pred_obs
+    if graph_params['sim_results_tied']:
+        real_obs=param_tied_sim.real_obs
+        pred_obs=param_tied_sim.pred_obs
 
-        # building graphing parameters
-        chosen=max(param_tied_sim.probs.values())
-        pred_percent.append(chosen)
-        true_tar.append(genus)
-        pred_tar.append(param_tied_sim.probs.values().index(chosen))
-        if genus==param_tied_sim.probs.values().index(chosen):
-            correct[n]=1
-        correct_percent.append(sum(correct)/(n+1))
-        all_theta2_tied[n,:,:]=param_tied_sim.theta2
-        theta2_full_alphas=np.empty((2*num_tar*num_tar,2*num_tar))
-        for X in range(num_tar):
-            for prev_obs in range(2*num_tar):
-                theta2_full_alphas[X*2*num_tar+prev_obs,:]=full_sim.theta2_full[X,prev_obs,:]
-        all_theta2_full[n,:,:]=theta2_full_alphas
-
-
-    graphs=Graphing(num_events,num_tar,alphas_start,param_tied_sim.theta2,
-            true_tar,pred_tar,param_tied_sim.real_obs,param_tied_sim.pred_obs,correct_percent,
-            correct_percent_ml,correct,pred_percent,all_theta2_tied,all_theta2_full,param_tied_sim.theta2_correct,
-            theta2_samples,param_tied_sim.X_samples)
-    #  plt.show()
+    graphs=Graphing(num_events,num_tar,alphas_start,theta2,true_tar_full,
+            pred_tar_full,real_obs,pred_obs,correct_percent_full,
+            correct_percent_ml_full,correct_full,pred_percent_full,true_tar_tied,
+            pred_tar_tied,correct_percent_tied,correct_percent_ml_tied,correct_tied,
+            pred_percent_tied,theta2_correct,theta2_samples,X_samples)
+    plt.show()
