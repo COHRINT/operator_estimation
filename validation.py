@@ -200,7 +200,10 @@ class DataFusion(Human):
                 for i in self.names:
                     # likelihood from theta1 (not full dist, assuming we know theta1)
                     index=self.select_param(self.names.index(i),obs[0])
-                    likelihood=self.theta1[index]
+                    if index%2==0:
+                        likelihood=self.theta1[index]
+                    else:
+                        likelihood=self.theta1[index]/(num_tar-1)
                     # likelihood from theta2
                     for value in obs[1:]:
                         likelihood*=theta2[self.names.index(i)*2*num_tar+obs[obs.index(value)-1],value]
@@ -288,7 +291,10 @@ class DataFusion(Human):
                 for i in self.names:
                     # lieklihood from theta1
                     index=self.select_param(self.names.index(i),obs[0])
-                    likelihood=self.theta1[index]
+                    if index%2==0:
+                        likelihood=self.theta1[index]
+                    else:
+                        likelihood=self.theta1[index]/(num_tar-1)
                     # likelihood from theta2
                     count=0
                     for value in obs[1:]:
