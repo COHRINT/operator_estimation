@@ -30,41 +30,33 @@ class HMM_Classification():
             allTypeLengths = []
             currentSet = dataSet[i]
             for j in range(len(currentSet)):
-                allTypeLengths.append(len(currentSet[j,:]))
+                allTypeData.append(currentSet[j])
+                allTypeLengths.append(len(currentSet[j]))
 
+            allTypeData=np.concatenate(allTypeData)
+            allTypeData=np.reshape(allTypeData,(-1,1))
 
-            currentSet=np.reshape(currentSet,(currentSet.shape[0]*currentSet.shape[1],1))
+            model = hmm.GaussianHMM(n_components=4).fit(allTypeData,allTypeLengths)
 
-            allModels = []
-            BICScores = []
-            for n_states in range(2,10):
-                modelTest = hmm.GaussianHMM(n_components=n_states).fit(currentSet,allTypeLengths)
-                allModels.append(modelTest)
-                logLikelihood,posteriors = modelTest.score_samples(currentSet,allTypeLengths)
-                bic = np.log(len(currentSet))*n_states - 2*logLikelihood
-                BICScores.append(bic)
+            model_store = {}
+            model_store['transition'] = model.transmat_.tolist()
+            model_store['prior'] = model.startprob_.tolist()
 
-            bestModel = allModels[np.argmin(BICScores)]
-            best = {}
-            best['transition'] = bestModel.transmat_.tolist()
-            best['prior'] = bestModel.startprob_.tolist()
-
-            means = bestModel.means_.tolist()
-            var = bestModel.covars_.tolist()
+            means = model.means_.tolist()
+            var = model.covars_.tolist()
             obs = []
             for j in range(len(means)):
                 obs.append(GM(means[j],var[j],1))
 
-            best['obs'] = obs
+            model_store['obs'] = obs
 
-            histModels['Cumuliform'+str(i)] = best
+            histModels['Cumuliform'+str(i)] = model_store
 
         np.save(saveFileName,histModels)
 
-    def buildDataSet(self, num_sets=100):
-        #  models=[Cumuliform]
+    def buildDataSet(self, num_sets=100000):
         subs=[str(i) for i in range(5)]
-        allSeries=np.empty((5,num_sets,100))
+        allSeries=[[],[],[],[],[]]
         for i in range(5):
             model=Cumuliform(genus=i,weather=False)
             b=copy.deepcopy(model.intensityModel)
@@ -72,7 +64,7 @@ class HMM_Classification():
                 c=b+np.random.normal(0,2,(len(b)))
                 for k in range(len(c)):
                     c[k]=max(c[k],1e-5)
-                allSeries[i,j,:]=c
+                allSeries[i].append(c)
         return allSeries
 
 
@@ -85,9 +77,8 @@ class HMM_Classification():
         if prevAlpha[0] == -1:
             prevAlpha=x0
 
-        newAlpha = [-1]*numStates
+        newAlpha = [0]*numStates
         for xcur in range(numStates):
-            newAlpha[xcur] = 0
             for xprev in range(numStates):
                 newAlpha[xcur] += prevAlpha[xprev]*pxx[xcur][xprev]
             newAlpha[xcur] = newAlpha[xcur]*pyx[xcur].pointEval(newData)
@@ -102,6 +93,7 @@ class HMM_Classification():
         #  for i in range(num_tar):
         for i in tqdm(range(num_tar),ncols=100):
             genus=np.random.randint(5)
+            #  genus=0
             species = Cumuliform(genus = genus,weather=False)
             data = species.intensityModel
 
@@ -113,18 +105,21 @@ class HMM_Classification():
             probs = {}
             for i in genNames:
                 probs[i] = .2
-
-            while max(probs.values())<0.9:
-                for d in data:
+            
+            count=0
+            while max(probs.values())<0.6:
                     #update classification probs
                     for i in genNames:
-                        alphas[i] = self.continueForward(d, models[i], alphas[i])
+                        alphas[i] = self.continueForward(data[count], models[i], alphas[i])
+                        #  print alphas[i]
                         probs[i] = probs[i]*sum(alphas[i])
 
                     #normalize probs
                     suma = sum(probs.values())
                     for i in genNames:
                         probs[i] = probs[i]/suma
+                    count+=1
+            #  print np.max(probs.values())
             chosen=np.argmax(probs.values())
             #  print genus,chosen
             if genus==chosen:
@@ -142,4 +137,4 @@ if __name__ == '__main__':
         hc.buildModels(dataSet)
 
     if 'test' in commands:
-        hc.testHMM(100)
+        hc.testHMM(500)
