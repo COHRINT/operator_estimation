@@ -21,7 +21,7 @@ np.set_printoptions(precision=2)
 
 class Graphing():
     def __init__(self,num_events,num_tar,alphas_start=None,theta2=None,true_tar_full=None,
-            pred_tar_full=None,real_obs=None,pred_obs=None,correct_percent_full=None,
+            pred_tar_full=None,real_obs=None,pred_obs=None,pred_tar_ml=None,correct_percent_full=None,
             correct_percent_ml_full=None,correct_full=None,pred_percent_full=None,true_tar_tied=None,
             pred_tar_tied=None,correct_percent_tied=None,correct_percent_ml_tied=None,correct_tied=None,
             pred_percent_tied=None,theta2_correct=None,theta2_samples=None,X_samples=None):
@@ -34,24 +34,50 @@ class Graphing():
         if (theta2_samples is not None) and (X_samples is not None):
             print "Making Gibbs Validation Plots"
             self.gibbs_validation(num_tar,theta2_samples,X_samples)
-        condition_full=((true_tar_full is not None) and (pred_tar_full is not None) and
-                (real_obs is not None) and (pred_obs is not None) and 
-                (correct_percent_full is not None) and (correct_percent_ml_full is not None) and 
-                (correct_full is not None) and (pred_percent_full is not None))
-        if condition_full:
-            print "Making Experiment Results Plot"
-            self.experimental_results(true_tar_full,pred_tar_full,real_obs,
-                    pred_obs,num_events,correct_percent_full,
-                correct_percent_ml_full,correct_full,pred_percent_full,style='(Full)')
-        condition_tied=((true_tar_tied is not None) and (pred_tar_tied is not None) and
-                (real_obs is not None) and (pred_obs is not None) and 
-                (correct_percent_tied is not None) and (correct_percent_ml_tied is not None) and 
-                (correct_tied is not None) and (pred_percent_tied is not None))
-        if condition_tied:
-            print "Making Experiment Results Plot"
-            self.experimental_results(true_tar_tied,pred_tar_tied,real_obs,
-                    pred_obs,num_events,correct_percent_tied,
-                correct_percent_ml_tied,correct_tied,pred_percent_tied,style='(Tied)')
+        #  # TODO: chang ethese conditions, only care about percent correct for full
+        #  condition_full=((true_tar_full is not None) and (pred_tar_full is not None) and
+        #          (real_obs is not None) and (pred_obs is not None) and
+        #          (correct_percent_full is not None) and (correct_percent_ml_full is not None) and
+        #          (correct_full is not None) and (pred_percent_full is not None))
+        #  if condition_full:
+        #      print "Making Experiment Results Plot"
+        #      self.experimental_results(true_tar_full,pred_tar_full,real_obs,
+        #              pred_obs,num_events,correct_percent_full,
+        #          correct_percent_ml_full,correct_full,pred_percent_full,style='(Full)')
+        #  condition_tied=((true_tar_tied is not None) and (pred_tar_tied is not None) and
+        #          (real_obs is not None) and (pred_obs is not None) and
+        #          (correct_percent_tied is not None) and (correct_percent_ml_tied is not None) and
+        #          (correct_tied is not None) and (pred_percent_tied is not None))
+        #  if condition_tied:
+        #      print "Making Experiment Results Plot"
+        #      self.experimental_results(true_tar_tied,pred_tar_tied,real_obs,
+        #              pred_obs,num_events,correct_percent_tied,
+        #          correct_percent_ml_tied,correct_tied,pred_percent_tied,style='(Tied)')
+        if (true_tar_full is not None) and (pred_tar_full is not None):
+            print "Making Full Sim Confusion Matrix"
+            self.confusion(true_tar_full,pred_tar_full,style='target',
+                    title='Full Sim Target Confusion Matrix',filename='full_tar_confusion')
+        if (true_tar_tied is not None) and (pred_tar_tied is not None):
+            print "Making Tied Sim Confusion Matrix"
+            self.confusion(true_tar_tied,pred_tar_tied,style='target',
+                    title='Tied Sim Target Confusion Matrix',filename='tied_tar_confusion')
+        if (true_tar_tied is not None) and (pred_tar_ml is not None):
+            print "Making ML Confusion Matrix"
+            self.confusion(true_tar_tied,pred_tar_tied,style='target',
+                    title='ML Target Confusion Matrix',filename='ml_tar_confusion')
+        if (real_obs is not None) and (pred_obs is not None):
+            print "Making Operator Confusion Matrix"
+            self.confusion(real_obs,pred_obs,style='obs',
+                    title='Operator Confusion Matrix',filename='operator_confusion')
+        if (correct_percent_tied is not None) and (correct_percent_ml_tied is not None) and (correct_percent_full is not None):
+            print "Making Percent Correct Plot"
+            self.percent_correct(num_events,correct_percent_tied,correct_percent_ml_tied,correct_percent_full)
+        elif (correct_percent_tied is not None) and (correct_percent_ml_tied is not None):
+            print "Making Percent Correct Plot"
+            self.percent_correct(num_events,correct_percent_tied,correct_percent_ml_tied)
+        elif (correct_percent_full is not None) and (correct_percent_ml_full is not None):
+            print "Making Percent Correct Plot"
+            self.percent_correct(num_events,correct_percent_full,correct_percent_ml_full)
         #  print "Making Theta2 Validation GIF"
         #  self.human_validation()
         #  print "Making Convergence GIF"
@@ -212,6 +238,40 @@ class Graphing():
         fig1.savefig('figures/gibbs_validation_theta.png',bbox_inches='tight',pad_inches=0)
         fig2.savefig('figures/gibbs_validation_X.png',bbox_inches='tight',pad_inches=0)
 
+    def confusion(self,true,pred,style,title,filename):
+        fig=plt.figure()
+        cm=confusion_matrix(true,pred)
+        cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
+        plt.imshow(cm,cmap='Blues')
+        if style=='target':
+            plt.ylabel('True Label')
+            plt.xlabel('Given Label')
+        elif style=='obs':
+            plt.ylabel('True Value')
+            plt.xlabel('Given Obs')
+            plt.xticks([0,1],['pos','neg'])
+            plt.yticks([0,1],['pos','neg'])
+        plt.title(title)
+        for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
+            plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+
+        fig.savefig('figures/'+filename+'.png',bbox_inches='tight',pad_inches=0)
+
+    def percent_correct(self,num_events,correct_percent,correct_percent_ml,correct_percent_full=None):
+        fig=plt.figure()
+        if correct_percent_full is not None:
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)")
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
+        else:
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct")
+        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml[5:], label="wo/Human Total Correct")
+        plt.legend()
+        plt.xlabel('Number of Targets')
+        plt.ylabel('Percent Correct')
+        plt.title('Correct Classification')
+
+        fig.savefig('figures/percent_correct.png',bbox_inches='tight',pad_inches=0)
+
     def experimental_results(self,true_tar,pred_tar,real_obs,pred_obs,num_events,correct_percent,
             correct_percent_ml,correct,pred_percent,style='(Tied)'):
         fig=plt.figure(figsize=(12,9))
@@ -237,6 +297,7 @@ class Graphing():
         plt.yticks([0,1],['pos','neg'])
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
             plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+        plt.show()
 
         plt.subplot(223)
         plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct")
