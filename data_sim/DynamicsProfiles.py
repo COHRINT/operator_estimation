@@ -11,8 +11,7 @@ class AbstractProfile():
 		self.time = startTime; 
 		state = startPose; 
 		self.weather = weather;
-		#  self.genus = genus;
-		self.genus = random.randint(0,4)
+                self.genus = genus;
 
                 if -100<=startPose[0]<=50:
                     velX=random.random()*2
@@ -375,22 +374,37 @@ class Cumuliform(FamilyContainer):
 		intense = np.zeros(shape=(100)); 
 		
 
+                if(self.genus==0):
+                        stageSets = [0,15,50,70,100];
+                        vals = [4,6,1,8];
+                elif(self.genus == 1):
+                        stageSets = [0,10,50,65,100];
+                        vals = [8.5,5,2.5,5];
+                elif(self.genus == 2):
+                        stageSets = [0,5,50,60,100];
+                        vals = [6,3,4.5,6];
+                elif(self.genus == 3):
+                        stageSets = [0,20,40,75,100];
+                        vals = [7,9,3,5.5];
+                elif(self.genus == 4):
+                        stageSets = [0,5,45,60,100];
+                        vals = [5,4.5,0.5,3];
 
-		if(self.genus==0):
-			stageSets = [0,5,50,60,100]; 
-			vals = [7,4,2,5];
-		elif(self.genus == 1):
-			stageSets = [0,10,50,60,100]; 
-			vals = [7.5,4,2,5];
-		elif(self.genus == 2):
-			stageSets = [0,5,55,60,100]; 
-			vals = [7,4,2.5,5];
-		elif(self.genus == 3):
-			stageSets = [0,5,50,70,100]; 
-			vals = [7,4,2,5.5];
-		elif(self.genus == 4):
-			stageSets = [0,5,45,60,100]; 
-			vals = [7,4.5,2,5];
+                #  if(self.genus==0):
+                #          stageSets = [0,5,50,60,100];
+                #          vals = [7,4,2,5];
+                #  elif(self.genus == 1):
+                #          stageSets = [0,10,50,60,100];
+                #          vals = [7.5,4,2,5];
+                #  elif(self.genus == 2):
+                #          stageSets = [0,5,55,60,100];
+                #          vals = [7,4,2.5,5];
+                #  elif(self.genus == 3):
+                #          stageSets = [0,5,50,70,100];
+                #          vals = [7,4,2,5.5];
+                #  elif(self.genus == 4):
+                #          stageSets = [0,5,45,60,100];
+                #          vals = [7,4.5,2,5];
 
 		for i in range(1,len(stageSets)):
 			for j in range(stageSets[i-1],stageSets[i]):
