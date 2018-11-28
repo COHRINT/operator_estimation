@@ -455,6 +455,7 @@ if __name__ == '__main__':
         # target confusion matrix
         true_tar_full=[]
         pred_tar_full=[]
+        pred_tar_full_ml=[]
         # precision recall
         pred_percent_full=[]
         correct_full=[0]*num_events
@@ -466,6 +467,7 @@ if __name__ == '__main__':
         # target confusion matrix
         true_tar_full=None
         pred_tar_full=None
+        pred_tar_full_ml=None
         # precision recall
         pred_percent_full=None
         correct_full=None
@@ -477,6 +479,7 @@ if __name__ == '__main__':
         # target confusion matrix
         true_tar_tied=[]
         pred_tar_tied=[]
+        pred_tar_tied_ml=[]
         # precision recall
         pred_percent_tied=[]
         correct_tied=[0]*num_events
@@ -488,6 +491,7 @@ if __name__ == '__main__':
         # target confusion matrix
         true_tar_tied=None
         pred_tar_tied=None
+        pred_tar_tied_ml=None
         # precision recall
         pred_percent_tied=None
         correct_tied=None
@@ -523,74 +527,107 @@ if __name__ == '__main__':
         #  param_tied_sim.make_data(genus)
 
         # getting a prior from ML
-        if cfg['sim_types']['full_dir']:
-            full_sim.probs={}
-            if cfg['starting_dist']=='uniform':
+        if cfg['starting_dist']=='assist':
+            if (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
+                param_tied_sim.make_data(genus)
+                param_tied_sim.frame=0
+                param_tied_sim.alphas={}
+                param_tied_sim.probs={}
+                for i in param_tied_sim.names:
+                    param_tied_sim.alphas[i]=[-1,-1]
+                    param_tied_sim.probs[i]=.2
+                while max(param_tied_sim.probs.values())<0.6:
+                    param_tied_sim.updateProbsML()
+                    param_tied_sim.frame+=1
+                full_sim.probs=param_tied_sim.probs
+                chosen=np.argmax(param_tied_sim.probs.values())
+                if graph_params['sim_results_full']:
+                    if genus==chosen:
+                        correct_ml_full[n]=1
+                    correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
+                    pred_tar_full_ml.append(np.argmax(param_tied_sim.probs.values()))
+                if graph_params['sim_results_tied']:
+                    if genus==chosen:
+                        correct_ml_tied[n]=1
+                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+                    pred_tar_tied_ml.append(np.argmax(param_tied_sim.probs.values()))
+
+            elif (cfg['sim_types']['full_dir']) and not (cfg['sim_types']['param_tied_dir']):
+                full_sim.make_data(genus)
+                full_sim.frame=0
+                full_sim.alphas={}
+                full_sim.probs={}
+                for i in full_sim.names:
+                    full_sim.alphas[i]=[-1,-1]
+                    full_sim.probs[i]=.2
+                while max(full_sim.probs.values())<0.6:
+                    full_sim.updateProbsML()
+                    full_sim.frame+=1
+                chosen=np.argmax(full_sim.probs.values())
+                if graph_params['sim_results_full']:
+                    if genus==chosen:
+                        correct_ml_full[n]=1
+                    correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
+                    pred_tar_full_ml.append(np.argmax(full_sim.probs.values()))
+
+            elif not (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
+                param_tied_sim.make_data(genus)
+                param_tied_sim.frame=0
+                param_tied_sim.alphas={}
+                param_tied_sim.probs={}
+                for i in param_tied_sim.names:
+                    param_tied_sim.alphas[i]=[-1,-1]
+                    param_tied_sim.probs[i]=.2
+                while max(param_tied_sim.probs.values())<0.6:
+                    param_tied_sim.updateProbsML()
+                    param_tied_sim.frame+=1
+                chosen=np.argmax(param_tied_sim.probs.values())
+                if graph_params['sim_results_tied']:
+                    if genus==chosen:
+                        correct_ml_tied[n]=1
+                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+                    pred_tar_tied_ml.append(np.argmax(param_tied_sim.probs.values()))
+
+        elif cfg['starting_dist']=='uniform':
+            if (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
+                full_sim.probs={}
+                param_tied_sim.probs={}
+                for i in param_tied_sim.names:
+                    full_sim.probs[i]=.2
+                    param_tied_sim.probs[i]=.2
+                #TODO: this needs to change for different target number
+                chosen=np.random.choice([0,0,0,0,1])
+                if graph_params['sim_results_full']:
+                    correct_ml_full[n]=chosen
+                    correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
+                    pred_tar_full_ml.append(np.random.randint(num_tar))
+                if graph_params['sim_results_tied']:
+                    correct_ml_tied[n]=chosen
+                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+                    pred_tar_tied_ml.append(np.random.randint(num_tar))
+            elif (cfg['sim_types']['full_dir']) and not (cfg['sim_types']['param_tied_dir']):
+                full_sim.probs={}
                 for i in full_sim.names:
                     full_sim.probs[i]=.2
                 if graph_params['sim_results_full']:
-                    correct_ml_full[n]=np.random.choice([0,0,0,0,1],p=full_sim.probs.values())
+                    correct_ml_full[n]=np.random.choice([0,0,0,0,1])
                     correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
-            elif cfg['starting_dist']=='assist':
-                #  sim.frame=0
-                #  for i in sim.names:
-                #      sim.alphas[i]=[-1,-1]
-                for i in full_sim.names:
-                    if full_sim.names.index(i)==genus:
-                        full_sim.probs[i]=np.random.normal(.75,.25)
-                    else:
-                        full_sim.probs[i]=np.random.normal(.25,.25)
-                    if full_sim.probs[i]<0:
-                        full_sim.probs[i]=0.01
-                for i in full_sim.names:
-                    full_sim.probs[i]/=sum(full_sim.probs.values())
-
-                if graph_params['sim_results_full']:
-                    chosen_ml_full=max(full_sim.probs.values())
-                    if genus==full_sim.probs.values().index(chosen_ml_full):
-                        correct_ml_full[n]=1
-                    correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
-
-            full_sim_probs=full_sim.probs.values()
-            count_full=0
-
-        if cfg['sim_types']['param_tied_dir']:
-            param_tied_sim.probs={}
-            if cfg['starting_dist']=='uniform':
+                    pred_tar_full_ml.append(np.random.randint(num_tar))
+            elif not (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
+                param_tied_sim.probs={}
                 for i in param_tied_sim.names:
                     param_tied_sim.probs[i]=.2
                 if graph_params['sim_results_tied']:
-                    correct_ml_tied[n]=np.random.choice([0,0,0,0,1],p=param_tied_sim.probs.values())
+                    correct_ml_tied[n]=np.random.choice([0,0,0,0,1])
                     correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
-            elif cfg['starting_dist']=='assist':
-                #  sim.frame=0
-                #  for i in sim.names:
-                #      sim.alphas[i]=[-1,-1]
-                for i in param_tied_sim.names:
-                    if param_tied_sim.names.index(i)==genus:
-                        param_tied_sim.probs[i]=np.random.normal(.75,.25)
-                    else:
-                        param_tied_sim.probs[i]=np.random.normal(.25,.25)
-                    if param_tied_sim.probs[i]<0:
-                        param_tied_sim.probs[i]=0.01
-                for i in param_tied_sim.names:
-                    param_tied_sim.probs[i]/=sum(param_tied_sim.probs.values())
+                    pred_tar_tied_ml.append(np.random.randint(num_tar))
 
-                if graph_params['sim_results_tied']:
-                    chosen_ml_tied=max(param_tied_sim.probs.values())
-                    if genus==param_tied_sim.probs.values().index(chosen_ml_tied):
-                        correct_ml_tied[n]=1
-                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
-
-            param_tied_sim_probs=param_tied_sim.probs.values()
-            count_tied=0
-
-        #  for i in range(sim.frame,sim.frame+10):
-        #      if i<100:
-        #          sim.updateProbsML()
-        #          sim.frame+=1
         obs=[]
         if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir']:
+            full_sim_probs=full_sim.probs.values()
+            param_tied_sim_probs=param_tied_sim.probs.values()
+            count_full=0
+            count_tied=0
             while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold):
                 obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
                 if max(full_sim_probs)<threshold:
@@ -604,6 +641,8 @@ if __name__ == '__main__':
             if count_tied>1:
                 param_tied_sim.moment_matching()
         elif cfg['sim_types']['full_dir']:
+            full_sim_probs=full_sim.probs.values()
+            count_full=0
             while (max(full_sim_probs)<threshold):
                 obs=full_sim.HumanObservations(num_tar,genus,obs)
                 full_sim_probs=full_sim.sampling_full(num_tar,obs)
@@ -612,21 +651,24 @@ if __name__ == '__main__':
             if count_full>1:
                 full_sim.moment_matching_full()
         elif cfg['sim_types']['param_tied_dir']:
+            param_tied_sim_probs=param_tied_sim.probs.values()
+            count_tied=0
             while (max(param_tied_sim_probs)<threshold):
                 obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
                 param_tied_sim_probs=param_tied_sim.sampling_full(num_tar,obs)
                 count_tied+=1
 
-            if count_tied>1:
-                param_tied_sim.moment_matching()
+            if graph_params['gibbs_val']:
+                if count_tied>1:
+                    param_tied_sim.moment_matching()
 
-            # need a run where all 16 have been sampled, keep storing until a run produces that
-            if count_tied>1:
-                for i in range(4):
-                    for j in range(4):
-                        samples=param_tied_sim.theta2_samples[np.nonzero(param_tied_sim.theta2_samples[:,i,j]),i,j]
-                        if len(samples[0])>len(theta2_samples[i*4+j]):
-                            theta2_samples[i*4+j]=samples[0]
+                # need a run where all 16 have been sampled, keep storing until a run produces that
+                if count_tied>1:
+                    for i in range(4):
+                        for j in range(4):
+                            samples=param_tied_sim.theta2_samples[np.nonzero(param_tied_sim.theta2_samples[:,i,j]),i,j]
+                            if len(samples[0])>len(theta2_samples[i*4+j]):
+                                theta2_samples[i*4+j]=samples[0]
 
         if graph_params['sim_results_full']:
             # building graphing parameters
@@ -655,17 +697,30 @@ if __name__ == '__main__':
     if graph_params['theta_val']:
         theta2=param_tied_sim.theta2
         theta2_correct=param_tied_sim.theta2_correct
+    else:
+        theta2=None
+        theta2_correct=None
     if graph_params['gibbs_val']:
         X_samples=param_tied_sim.X_samples
+    else:
+        X_samples=None
     if graph_params['sim_results_full']:
         real_obs=full_sim.real_obs
         pred_obs=full_sim.pred_obs
+        pred_tar_ml=pred_tar_full_ml
     if graph_params['sim_results_tied']:
         real_obs=param_tied_sim.real_obs
         pred_obs=param_tied_sim.pred_obs
+        pred_tar_ml=pred_tar_tied_ml
+    if not (graph_params['sim_results_tied']) and not (graph_params['sim_results_full']):
+        real_obs=None
+        pred_obs=None
+        pred_tar_ml=None
 
+
+    # TODO: need pred_tar_ml
     graphs=Graphing(num_events,num_tar,alphas_start,theta2,true_tar_full,
-            pred_tar_full,real_obs,pred_obs,correct_percent_full,
+            pred_tar_full,real_obs,pred_obs,pred_tar_ml,correct_percent_full,
             correct_percent_ml_full,correct_full,pred_percent_full,true_tar_tied,
             pred_tar_tied,correct_percent_tied,correct_percent_ml_tied,correct_tied,
             pred_percent_tied,theta2_correct,theta2_samples,X_samples)
