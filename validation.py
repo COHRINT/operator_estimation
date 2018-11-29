@@ -640,6 +640,16 @@ if __name__ == '__main__':
                 full_sim.moment_matching_full()
             if count_tied>1:
                 param_tied_sim.moment_matching()
+
+            if graph_params['gibbs_val']:
+                # need a run where all 16 have been sampled, keep storing until a run produces that
+                if count_tied>1:
+                    for i in range(4):
+                        for j in range(4):
+                            samples=param_tied_sim.theta2_samples[np.nonzero(param_tied_sim.theta2_samples[:,i,j]),i,j]
+                            if len(samples[0])>len(theta2_samples[i*4+j]):
+                                theta2_samples[i*4+j]=samples[0]
+
         elif cfg['sim_types']['full_dir']:
             full_sim_probs=full_sim.probs.values()
             count_full=0
@@ -658,10 +668,10 @@ if __name__ == '__main__':
                 param_tied_sim_probs=param_tied_sim.sampling_full(num_tar,obs)
                 count_tied+=1
 
-            if graph_params['gibbs_val']:
-                if count_tied>1:
-                    param_tied_sim.moment_matching()
+            if count_tied>1:
+                param_tied_sim.moment_matching()
 
+            if graph_params['gibbs_val']:
                 # need a run where all 16 have been sampled, keep storing until a run produces that
                 if count_tied>1:
                     for i in range(4):
@@ -701,7 +711,8 @@ if __name__ == '__main__':
         theta2=None
         theta2_correct=None
     if graph_params['gibbs_val']:
-        X_samples=param_tied_sim.X_samples
+        #  X_samples=param_tied_sim.X_samples
+        X_samples=None
     else:
         X_samples=None
     if graph_params['sim_results_full']:
@@ -718,7 +729,6 @@ if __name__ == '__main__':
         pred_tar_ml=None
 
 
-    # TODO: need pred_tar_ml
     graphs=Graphing(num_events,num_tar,alphas_start,theta2,true_tar_full,
             pred_tar_full,real_obs,pred_obs,pred_tar_ml,correct_percent_full,
             correct_percent_ml_full,correct_full,pred_percent_full,true_tar_tied,

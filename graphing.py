@@ -31,9 +31,11 @@ class Graphing():
         if (theta2_correct is not None) and (alphas_start is not None) and (theta2 is not None):
             print "Making Theta Validation Plots"
             self.theta_validation(num_tar,theta2_correct,alphas_start,theta2)
-        if (theta2_samples is not None) and (X_samples is not None):
+        #  if (theta2_samples is not None) and (X_samples is not None):
+        if theta2_samples is not None:
             print "Making Gibbs Validation Plots"
-            self.gibbs_validation(num_tar,theta2_samples,X_samples)
+            #  self.gibbs_validation(num_tar,theta2_samples,X_samples)
+            self.gibbs_validation(num_tar,theta2_samples)
         #  # TODO: chang ethese conditions, only care about percent correct for full
         #  condition_full=((true_tar_full is not None) and (pred_tar_full is not None) and
         #          (real_obs is not None) and (pred_obs is not None) and
@@ -63,7 +65,7 @@ class Graphing():
                     title='Tied Sim Target Confusion Matrix',filename='tied_tar_confusion')
         if (true_tar_tied is not None) and (pred_tar_ml is not None):
             print "Making ML Confusion Matrix"
-            self.confusion(true_tar_tied,pred_tar_tied,style='target',
+            self.confusion(true_tar_tied,pred_tar_ml,style='target',
                     title='ML Target Confusion Matrix',filename='ml_tar_confusion')
         if (real_obs is not None) and (pred_obs is not None):
             print "Making Operator Confusion Matrix"
@@ -191,52 +193,74 @@ class Graphing():
                 ax[i,j].legend()
         fig.savefig('figures/theta_validation.png',bbox_inches='tight',pad_inches=0)
 
-    def gibbs_validation(self,num_tar,theta2_samples,X_samples):
-        for i in range(16):
+    #  def gibbs_validation(self,num_tar,theta2_samples,X_samples):
+    def gibbs_validation(self,num_tar,theta2_samples):
+        for i in range(4):
             if len(theta2_samples[i])==0:
                 print "At least one case produced no samples, must have samples for gibbs graph"
                 return
         strings=['TP','FP','FN','TN']
-        colors=['g','y','r','c']
-        fig1=plt.figure(figsize=(18,12),tight_layout=True)
+        #  colors=['g','y','r','c']
+        #  fig1=plt.figure(figsize=(18,12),tight_layout=True)
+        #  fig1.suptitle(r'Signal, Histogram, and Autocorrelation of Gibbs Samples ($\theta_2$)',fontweight='bold')
+        #  for i in tqdm(range(4),ncols=100):
+        #      for j in range(4):
+        #          ax0=plt.subplot2grid((9,12),(2*i+1,3*j),colspan=2)
+        #          ax0.plot(range(len(theta2_samples[4*i+j])),theta2_samples[4*i+j],color=colors[i])
+        #          ax0.set_ylim((0,1))
+        #          ax0.set_title(strings[i]+', '+strings[j],fontweight='bold',loc='right')
+        #          ax0.set_xlabel('Sample #')
+        #          ax0.set_ylabel(r'p($\theta_2$)')
+        #          ax1=plt.subplot2grid((9,12),(2*i+1,3*j+2))
+        #          ax1.hist(theta2_samples[4*i+j],bins=20,range=(0,1),color=colors[i])
+        #          ax1.set_xlabel(r'p($\theta_2$)')
+        #          ax1.set_ylabel('Frequency')
+        #          ax2=plt.subplot2grid((9,12),(2*i+2,3*j),colspan=3)
+        #          corr=self.lagk_correlation(theta2_samples[4*i+j])
+        #          ax2.plot(range(len(corr)),corr,color=colors[i])
+        #          ax2.set_xlabel('Lag')
+        #          ax2.set_ylabel(r'$\rho$')
+        #  fig2=plt.figure(figsize=(16,12),tight_layout=True)
+        #  fig2.suptitle('Signal, Histogram, and Autocorrelation of Gibbs Samples (X)',fontweight='bold')
+        #  for i in tqdm(range(num_tar),ncols=100):
+        #      ax0=plt.subplot2grid((2*(int(num_tar/2)+num_tar%2)+1,6),(2*int(i/2)+1,3*(i%2)),colspan=2)
+        #      ax0.plot(range(len(X_samples[:,:,i])),X_samples[:,:,i])
+        #      ax0.set_ylim((0,1))
+        #      ax0.set_title('X='+str(i),fontweight='bold',loc='right')
+        #      ax0.set_xlabel('Sample #')
+        #      ax0.set_ylabel('p(X)')
+        #      ax1=plt.subplot2grid((2*(int(num_tar/2)+num_tar%2)+1,6),(2*int(i/2)+1,3*(i%2)+2))
+        #      ax1.hist(X_samples[:,:,i],bins=20,range=(0,1))
+        #      ax1.set_xlabel('p(X)')
+        #      ax1.set_ylabel('Frequency')
+        #      ax2=plt.subplot2grid((2*(int(num_tar/2)+num_tar%2)+1,6),(2*int(i/2)+2,3*(i%2)),colspan=3)
+        #      corr=self.lagk_correlation(X_samples[:,:,i])
+        #      ax2.plot(range(len(corr)),corr)
+        #      ax2.set_xlabel('Lag')
+        #      ax2.set_ylabel(r'$\rho$')
+        #  fig1.savefig('figures/gibbs_validation_theta.png',bbox_inches='tight',pad_inches=0)
+        #  fig2.savefig('figures/gibbs_validation_X.png',bbox_inches='tight',pad_inches=0)
+
+        fig1=plt.figure(figsize=(9,4),tight_layout=True)
         fig1.suptitle(r'Signal, Histogram, and Autocorrelation of Gibbs Samples ($\theta_2$)',fontweight='bold')
-        for i in tqdm(range(4),ncols=100):
-            for j in range(4):
-                ax0=plt.subplot2grid((9,12),(2*i+1,3*j),colspan=2)
-                ax0.plot(range(len(theta2_samples[4*i+j])),theta2_samples[4*i+j],color=colors[i])
-                ax0.set_ylim((0,1))
-                ax0.set_title(strings[i]+', '+strings[j],fontweight='bold',loc='right')
-                ax0.set_xlabel('Sample #')
-                ax0.set_ylabel(r'p($\theta_2$)')
-                ax1=plt.subplot2grid((9,12),(2*i+1,3*j+2))
-                ax1.hist(theta2_samples[4*i+j],bins=20,range=(0,1),color=colors[i])
-                ax1.set_xlabel(r'p($\theta_2$)')
-                ax1.set_ylabel('Frequency')
-                ax2=plt.subplot2grid((9,12),(2*i+2,3*j),colspan=3)
-                corr=self.lagk_correlation(theta2_samples[4*i+j])
-                ax2.plot(range(len(corr)),corr,color=colors[i])
-                ax2.set_xlabel('Lag')
-                ax2.set_ylabel(r'$\rho$')
-        fig2=plt.figure(figsize=(16,12),tight_layout=True)
-        fig2.suptitle('Signal, Histogram, and Autocorrelation of Gibbs Samples (X)',fontweight='bold')
-        for i in tqdm(range(num_tar),ncols=100):
-            ax0=plt.subplot2grid((2*(int(num_tar/2)+num_tar%2)+1,6),(2*int(i/2)+1,3*(i%2)),colspan=2)
-            ax0.plot(range(len(X_samples[:,:,i])),X_samples[:,:,i])
+        for j in range(2):
+            ax0=plt.subplot2grid((3,6),(1,3*j),colspan=2)
+            ax0.plot(range(len(theta2_samples[j])),theta2_samples[j])
             ax0.set_ylim((0,1))
-            ax0.set_title('X='+str(i),fontweight='bold',loc='right')
+            ax0.set_title('TP, '+strings[j],fontweight='bold',loc='right')
             ax0.set_xlabel('Sample #')
-            ax0.set_ylabel('p(X)')
-            ax1=plt.subplot2grid((2*(int(num_tar/2)+num_tar%2)+1,6),(2*int(i/2)+1,3*(i%2)+2))
-            ax1.hist(X_samples[:,:,i],bins=20,range=(0,1))
-            ax1.set_xlabel('p(X)')
+            ax0.set_ylabel(r'p($\theta_2$)')
+            ax1=plt.subplot2grid((3,6),(1,3*j+2))
+            ax1.hist(theta2_samples[j],bins=20,range=(0,1))
+            ax1.set_xlabel(r'p($\theta_2$)')
             ax1.set_ylabel('Frequency')
-            ax2=plt.subplot2grid((2*(int(num_tar/2)+num_tar%2)+1,6),(2*int(i/2)+2,3*(i%2)),colspan=3)
-            corr=self.lagk_correlation(X_samples[:,:,i])
+            ax2=plt.subplot2grid((3,6),(2,3*j),colspan=3)
+            corr=self.lagk_correlation(theta2_samples[j])
             ax2.plot(range(len(corr)),corr)
             ax2.set_xlabel('Lag')
             ax2.set_ylabel(r'$\rho$')
+
         fig1.savefig('figures/gibbs_validation_theta.png',bbox_inches='tight',pad_inches=0)
-        fig2.savefig('figures/gibbs_validation_X.png',bbox_inches='tight',pad_inches=0)
 
     def confusion(self,true,pred,style,title,filename):
         fig=plt.figure()
