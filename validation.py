@@ -35,7 +35,7 @@ __status__ = "maintained"
 
 class Human():
 
-    def DirPrior(self,num_tar):
+    def DirPrior(self,num_tar,human="good"):
         #init for confusion matrix
         self.pred_obs=[]
         self.real_obs=[]
@@ -76,17 +76,30 @@ class Human():
         base_table_real=np.ones((num_tar,2*num_tar))
         base_table_real*=5
         for i in range(5):
-            #tp
-            base_table_real[i,2*i]*=10
-            for j in range(5):
-                if i==j:
-                    #fn
-                    base_table_real[i,2*j+1]*=0.4
-                else:
-                    #tn
-                    base_table_real[i,2*j+1]*=1.67
-                    #fp
-                    base_table_real[i,2*j]*=0.4
+            if human=='good':
+                #tp
+                base_table_real[i,2*i]*=10
+                for j in range(5):
+                    if i==j:
+                        #fn
+                        base_table_real[i,2*j+1]*=0.4
+                    else:
+                        #tn
+                        base_table_real[i,2*j+1]*=1.67
+                        #fp
+                        base_table_real[i,2*j]*=0.4
+            elif human=='bad':
+                #tp
+                base_table_real[i,2*i]*=5
+                for j in range(5):
+                    if i==j:
+                        #fn
+                        base_table_real[i,2*j+1]*=1.5
+                    else:
+                        #tn
+                        base_table_real[i,2*j+1]*=5
+                        #fp
+                        base_table_real[i,2*j]*=2.5
         for i in range(2*num_tar):
             table_real[:,:,i]=base_table_real
         for i in range(2*num_tar):
@@ -450,6 +463,7 @@ if __name__ == '__main__':
     # initializing variables
     num_tar=cfg['num_tar']
     threshold=cfg['threshold']
+    human_type=cfg['human']
 
     if graph_params['sim_results_full']:
         # target confusion matrix
@@ -511,10 +525,10 @@ if __name__ == '__main__':
     # start sim
     if cfg['sim_types']['full_dir']:
         full_sim=DataFusion()
-        full_sim.DirPrior(num_tar)
+        full_sim.DirPrior(num_tar,human_type)
     if cfg['sim_types']['param_tied_dir']:
         param_tied_sim=DataFusion()
-        param_tied_sim.DirPrior(num_tar)
+        param_tied_sim.DirPrior(num_tar,human_type)
     if graph_params['theta_val']:
         alphas_start=copy.deepcopy(param_tied_sim.theta2)
     else:
@@ -623,12 +637,15 @@ if __name__ == '__main__':
                     pred_tar_tied_ml.append(np.random.randint(num_tar))
 
         obs=[]
+        start=time.time()
         if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir']:
             full_sim_probs=full_sim.probs.values()
             param_tied_sim_probs=param_tied_sim.probs.values()
             count_full=0
             count_tied=0
             while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold):
+                if time.time()-start>20:
+                    break
                 obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
                 if max(full_sim_probs)<threshold:
                     full_sim_probs=full_sim.sampling_full(num_tar,obs)
@@ -654,6 +671,8 @@ if __name__ == '__main__':
             full_sim_probs=full_sim.probs.values()
             count_full=0
             while (max(full_sim_probs)<threshold):
+                if time.time()-start>20:
+                    break
                 obs=full_sim.HumanObservations(num_tar,genus,obs)
                 full_sim_probs=full_sim.sampling_full(num_tar,obs)
                 count_full+=1
@@ -664,6 +683,8 @@ if __name__ == '__main__':
             param_tied_sim_probs=param_tied_sim.probs.values()
             count_tied=0
             while (max(param_tied_sim_probs)<threshold):
+                if time.time()-start>20:
+                    break
                 obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
                 param_tied_sim_probs=param_tied_sim.sampling_full(num_tar,obs)
                 count_tied+=1
