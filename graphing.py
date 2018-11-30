@@ -284,7 +284,7 @@ class Graphing():
     def percent_correct(self,num_events,correct_percent,correct_percent_ml,correct_percent_full=None):
         fig=plt.figure()
         if correct_percent_full is not None:
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)")
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
             plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
         else:
             plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct")
