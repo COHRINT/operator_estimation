@@ -175,12 +175,40 @@ class DataFusion(Human):
         self.alphas={}
         self.sampling_data=True
 
-    def make_data(self,genus):
+    def make_data(self,genus,graph=False):
         model=Cumuliform(genus=genus,weather=False)
         intensity_data=model.intensityModel+np.random.normal(0,2,(len(model.intensityModel)))
         for j in range(len(intensity_data)):
             intensity_data[j]=max(intensity_data[j],1e-5)
         self.intensity_data=intensity_data
+
+        if graph:
+            # without noise
+            plt.figure()
+            for genus in range(5):
+                model=Cumuliform(genus=genus,weather=False)
+                intensity_data=model.intensityModel
+                plt.plot(range(100),intensity_data,label=genus)
+            plt.xlabel('Time (frames)')
+            plt.ylabel('Intensity (Units)')
+            plt.title('Family: Cumuliform')
+            plt.legend()
+            plt.show()
+
+            # with noise
+            plt.figure()
+            for genus in range(5):
+                model=Cumuliform(genus=genus,weather=False)
+                intensity_data=model.intensityModel+np.random.normal(0,2,(len(model.intensityModel)))
+                for j in range(len(intensity_data)):
+                    intensity_data[j]=max(intensity_data[j],1e-5)
+                plt.plot(range(100),intensity_data,label=genus)
+            plt.xlabel('Time (frames)')
+            plt.ylabel('Intensity (Units)')
+            plt.title('Family: Cumuliform')
+            plt.legend()
+            plt.show()
+
 
     def updateProbsML(self):
         data=self.intensity_data[self.frame]
@@ -395,13 +423,16 @@ class DataFusion(Human):
                         self.theta2[n,k]=alphak
                     #DEBUG
                     if graph:
-                        if (n==1) and (k==0):
+                        if (n==0) and (k==0):
                             plt.figure()
                             plt.hist(samples,bins=20,density=True)
                             x=np.linspace(0,1)
                             plt.plot(x,scipy.stats.beta.pdf(x,alphak,sum(self.theta2[n,:])-alphak))
+                            plt.xlabel(r'$\theta_2$')
+                            plt.ylabel(r'$p(\theta_2)$')
+                            plt.title("Moment Matching for TP,TP")
                             plt.show()
-                            #  sys.exit()
+                            sys.exit()
 
     def select_param(self,target,current_obs,prev_obs=None):
         # translate an observation about a target into its type of obs

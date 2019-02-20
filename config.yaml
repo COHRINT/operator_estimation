@@ -2,12 +2,12 @@ starting_dist: 'assist' #uniform or assist
 num_tar: 5
 # threshold: 0.682
 threshold: 0.8
-human: 'good'
+human: 'bad'
 sim_types:
     param_tied_dir: True
     full_dir: True
 graphs:
-    theta_val: True
+    theta_val: False
     gibbs_val: False
     sim_results_full: True
     sim_results_tied: True

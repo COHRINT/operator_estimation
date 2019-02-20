@@ -54,7 +54,7 @@ class HMM_Classification():
 
         np.save(saveFileName,histModels)
 
-    def buildDataSet(self, num_sets=100000):
+    def buildDataSet(self, num_sets=100):
         subs=[str(i) for i in range(5)]
         allSeries=[[],[],[],[],[]]
         for i in range(5):

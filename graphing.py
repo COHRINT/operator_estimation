@@ -266,7 +266,7 @@ class Graphing():
         fig=plt.figure()
         cm=confusion_matrix(true,pred)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        plt.imshow(cm,cmap='Blues')
+        plt.imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
         if style=='target':
             plt.ylabel('True Label')
             plt.xlabel('Given Label')
@@ -292,6 +292,7 @@ class Graphing():
         plt.legend()
         plt.xlabel('Number of Targets')
         plt.ylabel('Percent Correct')
+        plt.ylim(0,1.1)
         plt.title('Correct Classification')
 
         fig.savefig('figures/percent_correct.png',bbox_inches='tight',pad_inches=0)
