@@ -95,7 +95,6 @@ class Fusion():
             for prev_obs in range(2*num_tar):
                 self.theta2_correct[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=table_real[X,prev_obs,:])
 
-
     def updateProbs(self,obs):
         postX=copy.deepcopy(self.probs)
         num_tar=5
@@ -175,6 +174,80 @@ class Fusion():
         self.post_probs=post_probs
         return post_probs
 
+    def sampling_full(self,obs):
+        postX=copy.deepcopy(self.probs)
+        num_tar=5
+        # only learning theta2 on 2+ observations
+        if len(obs)>1:
+            # initialize Dir sample
+            sample_check=[]
+            theta2_static=np.empty((2*num_tar*num_tar,2*num_tar))
+            #  all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
+            all_post=np.zeros(int((self.num_samples-self.burn_in)/5))
+            self.all_theta2=np.zeros((int((self.num_samples-self.burn_in)/5),2*num_tar*num_tar,2*num_tar))
+            for X in range(num_tar):
+                for prev_obs in range(2*num_tar):
+                    theta2_static[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
+
+            # begin gibbs sampling
+            theta2=copy.deepcopy(theta2_static)
+            for n in range(self.num_samples):
+                # calc X as if we knew theta2
+                for i in self.names:
+                    # likelihood from theta1 (not full dist, assuming we know theta1)
+                    index=self.select_param(self.names.index(i),obs[0])
+                    if index%2==0:
+                        likelihood=self.theta1[index]
+                    else:
+                        likelihood=self.theta1[index]/(num_tar-1)
+                    # likelihood from theta2
+                    for value in obs[1:]:
+                        likelihood*=theta2[self.names.index(i)*2*num_tar+obs[obs.index(value)-1],value]
+                    postX[i]=self.probs[i]*likelihood
+                # normalize
+                suma=sum(postX.values())
+                for i in self.names:
+                    postX[i]=np.log(postX[i])-np.log(suma) 
+                    postX[i]=np.exp(postX[i])
+                # sample from X
+                X=np.random.choice(range(num_tar),p=postX.values())
+                # store every 5th sample
+                if n%5==0:
+                    all_post[int((n-self.burn_in)/5)]=X
+                #      all_post[int((n-self.burn_in)/5),:,:]=postX.values()
+                alphas=copy.deepcopy(self.theta2_full)
+                theta2=copy.deepcopy(theta2_static)
+                # calc theta2 as if we knew X
+                for i in range(len(obs)-1):
+                    alphas[X,obs[i],obs[i+1]]+=1
+                for j in range(theta2.shape[1]):
+                    theta2[X*2*num_tar+j,:]=np.random.dirichlet(alphas[X,j,:])
+                if n%5==0:
+                    self.all_theta2[int((n-self.burn_in)/5),:,:]=theta2
+
+            # take max likelihood of X for next obs
+            #  post_probs=np.mean(all_post,axis=0)[0]
+            all_post=list(all_post)
+            post_probs=[all_post.count(0),all_post.count(1),all_post.count(2),all_post.count(3),all_post.count(4)]
+            post_probs=[x/len(all_post) for x in post_probs]
+
+        # using only theat1 on first observation
+        else:
+            for i in self.names:
+                # likelihood from theta1 (not full dist, assuming we know theta1)
+                index=self.select_param(self.names.index(i),obs[0])
+                likelihood=self.theta1[index]
+                postX[i]=self.probs[i]*likelihood
+            # normalize and set final values
+            suma=sum(postX.values())
+            for i in self.names:
+                postX[i]=np.log(postX[i])-np.log(suma) 
+                postX[i]=np.exp(postX[i])
+            port_probs=postX.values()
+
+        self.post_probs=post_probs
+        return post_probs
+
     def moment_matching(self,obs,graph=False):
         if (len(obs)>1) and (max(self.post_probs)>self.threshold):
             # moment matching of alphas from samples (Minka, 2000)
@@ -211,6 +284,34 @@ class Fusion():
                         #          plt.title("Moment Matching for TP,TP")
                         #          plt.show()
                         #          sys.exit()
+            self.reset=True
+        else:
+            self.reset=False
+
+    def moment_matching_full(self):
+        if (len(obs)>1) and (max(self.post_probs)>self.threshold):
+            # moment matching of alphas from samples (Minka, 2000)
+            sample_counts=np.zeros((2*num_tar*num_tar,2*num_tar))
+            for n in range(self.all_theta2.shape[1]):
+                sum_alpha=sum(self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),:])
+                for k in range(self.all_theta2.shape[2]):
+                    samples=self.all_theta2[:,n,k]
+                    if len(samples)==0:
+                        pass
+                    else:
+                        sample_counts[n,k]=len(samples)
+                        current_alpha=self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]
+                        for x in range(5):
+                            sum_alpha_old=sum_alpha-current_alpha+self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]
+                            logpk=np.sum(np.log(samples))/len(samples)
+                            y=psi(sum_alpha_old)+logpk
+                            if y>=-2.22:
+                                alphak=np.exp(y)+0.5
+                            else:
+                                alphak=-1/(y+psi(1))
+                            for w in range(5):
+                                alphak-=((psi(alphak)-y)/polygamma(1,alphak))
+                            self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]=alphak
             self.reset=True
         else:
             self.reset=False

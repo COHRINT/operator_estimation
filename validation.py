@@ -209,7 +209,6 @@ class DataFusion(Human):
             plt.legend()
             plt.show()
 
-
     def updateProbsML(self):
         data=self.intensity_data[self.frame]
         #forward algorithm
@@ -311,7 +310,6 @@ class DataFusion(Human):
                         for w in range(5):
                             alphak-=((psi(alphak)-y)/polygamma(1,alphak))
                         self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]=alphak
-
 
     def sampling_param_tied(self,num_tar,obs):
         postX=copy.deepcopy(self.probs)
