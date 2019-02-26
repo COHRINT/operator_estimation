@@ -1,5 +1,5 @@
 *.gz
-*.png
 *.gif
 *.pdf
 *.jpg
+/figures/
