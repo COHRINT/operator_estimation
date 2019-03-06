@@ -506,6 +506,10 @@ if __name__ == '__main__':
         correct_percent_full=[]
         correct_ml_full=[0]*num_events
         correct_percent_ml_full=[]
+        # timing
+        full_times=[]
+        full_number=[]
+        full_match_times=[]
     else:
         # target confusion matrix
         true_tar_full=None
@@ -530,6 +534,10 @@ if __name__ == '__main__':
         correct_percent_tied=[]
         correct_ml_tied=[0]*num_events
         correct_percent_ml_tied=[]
+        # timing
+        tied_times=[]
+        tied_number=[]
+        tied_match_times=[]
     else:
         # target confusion matrix
         true_tar_tied=None
@@ -666,26 +674,36 @@ if __name__ == '__main__':
                     pred_tar_tied_ml.append(np.random.randint(num_tar))
 
         obs=[]
-        start=time.time()
+        start_tar=time.time()
         if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir']:
             full_sim_probs=full_sim.probs.values()
             param_tied_sim_probs=param_tied_sim.probs.values()
             count_full=0
             count_tied=0
             while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold):
-                if time.time()-start>20:
+                if time.time()-start_tar>20:
                     break
                 obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
                 if max(full_sim_probs)<threshold:
+                    start=time.time()
                     full_sim_probs=full_sim.sampling_full(num_tar,obs)
+                    full_times.append(time.time()-start)
                     count_full+=1
                 if max(param_tied_sim_probs)<threshold:
+                    start=time.time()
                     param_tied_sim_probs=param_tied_sim.sampling_param_tied(num_tar,obs)
+                    tied_times.append(time.time()-start)
                     count_tied+=1
+            full_number.append(count_full)
+            tied_number.append(count_tied)
             if count_full>1:
+                start=time.time()
                 full_sim.moment_matching_full()
+                full_match_times.append(time.time()-start)
             if count_tied>1:
+                start=time.time()
                 param_tied_sim.moment_matching()
+                tied_match_times.append(time.time()-start)
 
             if graph_params['gibbs_val']:
                 # need a run where all 16 have been sampled, keep storing until a run produces that
@@ -707,7 +725,9 @@ if __name__ == '__main__':
                 count_full+=1
 
             if count_full>1:
+                start=time.time()
                 full_sim.moment_matching_full()
+                full_match_times.append(time.time()-start)
         elif cfg['sim_types']['param_tied_dir']:
             param_tied_sim_probs=param_tied_sim.probs.values()
             count_tied=0
@@ -719,7 +739,9 @@ if __name__ == '__main__':
                 count_tied+=1
 
             if count_tied>1:
+                start=time.time()
                 param_tied_sim.moment_matching()
+                tied_match_times.append(time.time()-start)
 
             if graph_params['gibbs_val']:
                 # need a run where all 16 have been sampled, keep storing until a run produces that
@@ -783,5 +805,6 @@ if __name__ == '__main__':
             pred_tar_full,real_obs,pred_obs,pred_tar_ml,correct_percent_full,
             correct_percent_ml_full,correct_full,pred_percent_full,true_tar_tied,
             pred_tar_tied,correct_percent_tied,correct_percent_ml_tied,correct_tied,
-            pred_percent_tied,theta2_correct,theta2_samples,X_samples)
+            pred_percent_tied,theta2_correct,theta2_samples,X_samples,full_times,
+            tied_times,full_number,tied_number,full_match_times,tied_match_times)
     plt.show()

@@ -24,7 +24,8 @@ class Graphing():
             pred_tar_full=None,real_obs=None,pred_obs=None,pred_tar_ml=None,correct_percent_full=None,
             correct_percent_ml_full=None,correct_full=None,pred_percent_full=None,true_tar_tied=None,
             pred_tar_tied=None,correct_percent_tied=None,correct_percent_ml_tied=None,correct_tied=None,
-            pred_percent_tied=None,theta2_correct=None,theta2_samples=None,X_samples=None):
+            pred_percent_tied=None,theta2_correct=None,theta2_samples=None,X_samples=None,full_times=None,
+            tied_times=None,full_number=None,tied_number=None,full_match_times=None,tied_match_times=None):
 
         self.gif_time=10 #seconds
 
@@ -36,6 +37,9 @@ class Graphing():
             print "Making Gibbs Validation Plots"
             #  self.gibbs_validation(num_tar,theta2_samples,X_samples)
             self.gibbs_validation(num_tar,theta2_samples)
+        if (full_times is not None) and (tied_times is not None):
+            print "Making Timing Comparison"
+            self.timing(full_times,tied_times,full_number,tied_number,full_match_times,tied_match_times)
         #  # TODO: chang ethese conditions, only care about percent correct for full
         #  condition_full=((true_tar_full is not None) and (pred_tar_full is not None) and
         #          (real_obs is not None) and (pred_obs is not None) and
@@ -501,8 +505,47 @@ class Graphing():
         fig.clear()
         plt.close()
 
-    def dependent_independent_compare(self):
-        pass
+    def timing(self,full_times,tied_times,full_number,tied_number,full_match_times,tied_match_times):
+        full_mean=np.mean(full_times)
+        full_std=np.std(full_times)
+        full_match=np.mean(full_match_times)
+        full_match_std=np.std(full_match_times)
+        tied_mean=np.mean(tied_times)
+        tied_std=np.std(tied_times)
+        tied_match=np.mean(tied_match_times)
+        tied_match_std=np.std(tied_match_times)
+        full_avg_num=np.mean(full_number)
+        tied_avg_num=np.mean(tied_number)
+        plt.figure()
+        plt.bar(range(2),[tied_mean,full_mean],yerr=[full_std,tied_std])
+        plt.title('Average Time for Gibbs Sampling (5000 samples)')
+        plt.ylabel('Seconds')
+        plt.xticks(range(2),('Tied','Full'))
+
+        plt.figure()
+        plt.bar(range(2),[tied_match,full_match],yerr=[tied_match_std,full_match_std],color='C1')
+        plt.title('Average Time for Moment Matching')
+        plt.ylabel('Seconds')
+        plt.xticks(range(2),('Tied','Full'))
+
+        plt.figure()
+        for i in range(int(tied_avg_num)):
+            plt.bar(0,tied_mean,color='C0',edgecolor='black',yerr=tied_std,bottom=i*tied_mean)
+        for i in range(int(full_avg_num)):
+            plt.bar(1,full_mean,color='C0',edgecolor='black',yerr=full_std,bottom=i*full_mean)
+        plt.bar(0,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',yerr=tied_std,
+                bottom=int(tied_avg_num)*tied_mean,label='sampling')
+        plt.bar(0,tied_match,color='C1',edgecolor='black',yerr=tied_match_std,
+                bottom=tied_avg_num*tied_mean,label='moment match')
+        plt.bar(1,(full_avg_num%1*full_mean),color='C0',edgecolor='black',yerr=full_std,
+                bottom=int(full_avg_num)*full_mean)
+        plt.bar(1,full_match,color='C1',edgecolor='black',yerr=full_match_std,
+                bottom=full_avg_num*full_mean)
+        plt.title('Average Total Time for Classification')
+        plt.ylabel('Seconds')
+        plt.xticks(range(2),('Tied','Full'))
+        plt.legend()
+
 
     def accuracy_comparison(self):
         # compare between independent and dependent
