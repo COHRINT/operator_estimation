@@ -43,6 +43,9 @@ class Human():
         #theta 1
         self.table=[5,2,0.5,8]
         self.theta1=scipy.stats.dirichlet.mean(alpha=self.table)
+        table_real=self.table+np.random.uniform(-1,1,4)
+        table_real[table_real<0]=0.1
+        self.theta1_correct=scipy.stats.dirichlet.mean(alpha=self.table)
 
         #theta2 param tied
         self.theta2=np.zeros((4,4))
@@ -122,7 +125,7 @@ class Human():
             #DEBUG
             #  print real_target
         else:
-            obs_type=np.random.choice(range(4),p=self.theta1)
+            obs_type=np.random.choice(range(4),p=self.theta1_correct)
             #tp
             if obs_type==0:
                 obs.append(2*real_target)
@@ -221,6 +224,7 @@ class DataFusion(Human):
             self.probs[i]/=suma
 
     def sampling_full(self,num_tar,obs):
+        #TODO add in theta1 full
         postX=copy.deepcopy(self.probs)
         # only learning theta2 on 2+ observations
         if len(obs)>1:
@@ -317,13 +321,17 @@ class DataFusion(Human):
         if len(obs)>1:
             # initialize Dir sample
             sample_check=[]
+            theta1_static=np.empty((1,4))
             theta2_static=np.empty((4,4))
             all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
+            self.theta1_samples=np.zeros((int((self.num_samples-self.burn_in)/5),4))
             self.theta2_samples=np.zeros((int((self.num_samples-self.burn_in)/5),4,4))
+            theta1_static=scipy.stats.dirichlet.mean(alpha=self.theta1)
             for i in range(4):
                 theta2_static[i,:]=scipy.stats.dirichlet.mean(alpha=self.theta2[i,:])
 
             # begin gibbs sampling
+            theta1=copy.deepcopy(theta1_static)
             theta2=copy.deepcopy(theta2_static)
             for n in range(self.num_samples):
                 # calc X as if we knew theta2
@@ -354,21 +362,21 @@ class DataFusion(Human):
                     all_post[int((n-self.burn_in)/5),:,:]=postX.values()
                 # sample from X
                 X=np.random.choice(range(num_tar),p=postX.values())
-                alphas=copy.deepcopy(self.theta2)
+                alphas1=copy.deepcopy(self.theta1)
+                alphas2=copy.deepcopy(self.theta2)
+                theta1=copy.deepcopy(theta1_static)
                 theta2=copy.deepcopy(theta2_static)
+                # calc theta1 as i we knew it
+                alphas1[self.select_param(X,obs[0])]+=1
+                theta1=np.random.dirichlet(alphas1)
                 # calc theta2 as is we knew X
                 for i in range(len(obs)-1):
                     indicies=self.select_param(X,obs[i+1],obs[i])
-                    #DEBUG
-                    #  if (n==500):
-                    #      print X,obs[i+1],obs[i],indicies
-                    #      print alphas
-                    alphas[indicies[0],indicies[1]]+=1
-                    #  if (n==500):
-                    #      print alphas
+                    alphas2[indicies[0],indicies[1]]+=1
                 for j in range(4):
-                    theta2[j,:]=np.random.dirichlet(alphas[j,:])
+                    theta2[j,:]=np.random.dirichlet(alphas2[j,:])
                 if n%5==0:
+                    self.theta1_samples[int((n-self.burn_in)/5),:]=theta1
                     self.theta2_samples[int((n-self.burn_in)/5),:,:]=theta2
 
             # storing data for graphs
@@ -431,6 +439,30 @@ class DataFusion(Human):
                             plt.title("Moment Matching for TP,TP")
                             plt.show()
                             sys.exit()
+
+    def moment_matching_small(self):
+        # moment matching of alphas from samples (Minka, 2000)
+        sample_counts=np.zeros((1,4))
+        #  for n in range(4):
+        sum_alpha=sum(self.theta1)
+        for k in range(4):
+            samples=self.theta1_samples[:,k]
+            if len(samples)==0:
+                pass
+            else:
+                sample_counts[k]=len(samples)
+                current_alpha=self.theta1[k]
+                for x in range(5):
+                    sum_alpha_old=sum_alpha-current_alpha+self.theta1[k]
+                    logpk=np.sum(np.log(samples))/len(samples)
+                    y=psi(sum_alpha_old)+logpk
+                    if y>=-2.22:
+                        alphak=np.exp(y)+0.5
+                    else:
+                        alphak=-1/(y+psi(1))
+                    for w in range(5):
+                        alphak-=((psi(alphak)-y)/polygamma(1,alphak))
+                    self.theta1[k]=alphak
 
     def select_param(self,target,current_obs,prev_obs=None):
         # translate an observation about a target into its type of obs
@@ -741,6 +773,7 @@ if __name__ == '__main__':
             if count_tied>1:
                 start=time.time()
                 param_tied_sim.moment_matching()
+                param_tied_sim.moment_matching_small()
                 tied_match_times.append(time.time()-start)
 
             if graph_params['gibbs_val']:

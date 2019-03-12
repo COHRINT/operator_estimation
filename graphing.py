@@ -142,6 +142,7 @@ class Graphing():
             rhok[k]=(numerator/denominator)
         return rhok
 
+    #TODO: adding theta1 validation
     def theta_validation(self,num_tar,theta2_correct,alphas_start,theta2):
         # need to make a dynamic sized list for all 16 params
         # there are a different number of parameters for each type
