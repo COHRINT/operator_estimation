@@ -25,13 +25,17 @@ class Graphing():
             correct_percent_ml_full=None,correct_full=None,pred_percent_full=None,true_tar_tied=None,
             pred_tar_tied=None,correct_percent_tied=None,correct_percent_ml_tied=None,correct_tied=None,
             pred_percent_tied=None,theta2_correct=None,theta2_samples=None,X_samples=None,full_times=None,
-            tied_times=None,full_number=None,tied_number=None,full_match_times=None,tied_match_times=None):
+            tied_times=None,full_number=None,tied_number=None,full_match_times=None,tied_match_times=None,
+            alphas1_start=None,theta1=None,theta1_correct=None):
 
         self.gif_time=10 #seconds
 
         if (theta2_correct is not None) and (alphas_start is not None) and (theta2 is not None):
             print "Making Theta Validation Plots"
             self.theta_validation(num_tar,theta2_correct,alphas_start,theta2)
+        if (theta1_correct is not None) and (alphas1_start is not None) and (theta1 is not None):
+            print "Making Theta Validation Plots"
+            self.theta1_validation(num_tar,theta1_correct,alphas1_start,theta1)
         #  if (theta2_samples is not None) and (X_samples is not None):
         if theta2_samples is not None:
             print "Making Gibbs Validation Plots"
@@ -142,7 +146,48 @@ class Graphing():
             rhok[k]=(numerator/denominator)
         return rhok
 
-    #TODO: adding theta1 validation
+    def theta1_validation(self,num_tar,theta1_correct,alphas_start,theta1):
+        # need to make a dynamic sized list for all 16 params
+        # there are a different number of parameters for each type
+        breakdown=[[],[],[],[]]
+
+        # assigning the theta2_correct table to tp,fp,fn,tn values
+        for i in range(theta1_correct.shape[0]):
+            if 2*int(i/(2*num_tar))==i%(2*num_tar):
+                index=0 #tp
+            elif i%2==0:
+                index=1 #fp
+            if 2*int(i/(2*num_tar))+1==i%(2*num_tar):
+                index=2 #fn
+            elif i%2==1:
+                index=3 #tn
+
+            if (index==1) or (index==3):
+                breakdown[index].append((num_tar-1)*theta1_correct[i])
+            else:
+                breakdown[index].append(theta1_correct[i])
+
+        # maginalizing out dimentions of dirichlet into beta functions
+        alpha_beta_start=np.empty((4,2))
+        alpha_beta_est=np.empty((4,2))
+        for i in range(4):
+            alpha_beta_start[i,:]=[alphas_start[i],sum(alphas_start)-alphas_start[i]]
+            alpha_beta_est[i,:]=[theta1[i],sum(theta1)-theta1[i]]
+
+        strings=['TP','FP','FN','TN']
+        fig,ax=plt.subplots(nrows=1,ncols=4,figsize=((15,4)),tight_layout=True)
+        #  fig.suptitle(r'Starting $p(\theta_2)$, Estimated $p(\theta_2)$, and True $\theta_2$',fontweight='bold')
+        x=np.linspace(0,1)
+        for i in range(4):
+            ax[i].plot(x,scipy.stats.beta.pdf(x,alpha_beta_start[i,0],alpha_beta_start[i,1]),label=r"Starting $p(\theta_1)$")
+            ax[i].plot(x,scipy.stats.beta.pdf(x,alpha_beta_est[i,0],alpha_beta_est[i,1]),label=r"Estimated $p(\theta_1)$")
+            ax[i].scatter(breakdown[i],len(breakdown[i])*[0],label=r'real $\theta$')
+            ax[i].set_xlabel(r'$\theta_1$')
+            ax[i].set_ylabel('PDF')
+            ax[i].set_title(strings[i],fontweight='bold')
+            ax[i].legend()
+        fig.savefig('figures/theta1_validation.png',bbox_inches='tight',pad_inches=0)
+
     def theta_validation(self,num_tar,theta2_correct,alphas_start,theta2):
         # need to make a dynamic sized list for all 16 params
         # there are a different number of parameters for each type
@@ -163,7 +208,7 @@ class Graphing():
                 if 2*int(i/(2*num_tar))==j:
                     index2=0
                 elif j%2==0:
-                        index2=1
+                    index2=1
                 if 2*int(i/(2*num_tar))+1==j:
                     index2=2
                 elif j%2==1:

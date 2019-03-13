@@ -42,7 +42,8 @@ class Human():
 
         #theta 1
         self.table=[5,2,0.5,8]
-        self.theta1=scipy.stats.dirichlet.mean(alpha=self.table)
+        self.theta1=copy.deepcopy(self.table)
+        #  self.theta1=scipy.stats.dirichlet.mean(alpha=self.table)
         table_real=self.table+np.random.uniform(-1,1,4)
         table_real[table_real<0]=0.1
         self.theta1_correct=scipy.stats.dirichlet.mean(alpha=self.table)
@@ -70,7 +71,8 @@ class Human():
         for i in range(2*num_tar):
             table_full[:,i,i]*=3
         table_full=np.swapaxes(table_full,1,2)
-
+        
+        self.theta1_full=base_table
         self.theta2_full=table_full
 
         # theta2 real
@@ -224,30 +226,29 @@ class DataFusion(Human):
             self.probs[i]/=suma
 
     def sampling_full(self,num_tar,obs):
-        #TODO add in theta1 full
         postX=copy.deepcopy(self.probs)
         # only learning theta2 on 2+ observations
         if len(obs)>1:
             # initialize Dir sample
             sample_check=[]
+            theta1_static=np.empty((num_tar,2*num_tar))
             theta2_static=np.empty((2*num_tar*num_tar,2*num_tar))
             all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
+            self.all_theta1=np.zeros((int((self.num_samples-self.burn_in)/5),num_tar,2*num_tar))
             self.all_theta2=np.zeros((int((self.num_samples-self.burn_in)/5),2*num_tar*num_tar,2*num_tar))
             for X in range(num_tar):
+                theta1_static[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_full[X,:])
                 for prev_obs in range(2*num_tar):
                     theta2_static[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
 
             # begin gibbs sampling
             theta2=copy.deepcopy(theta2_static)
+            theta1=copy.deepcopy(theta1_static)
             for n in range(self.num_samples):
                 # calc X as if we knew theta2
                 for i in self.names:
-                    # likelihood from theta1 (not full dist, assuming we know theta1)
-                    index=self.select_param(self.names.index(i),obs[0])
-                    if index%2==0:
-                        likelihood=self.theta1[index]
-                    else:
-                        likelihood=self.theta1[index]/(num_tar-1)
+                    # likelihood from theta1
+                    likelihood=theta1[self.names.index(i),obs[0]]
                     # likelihood from theta2
                     for value in obs[1:]:
                         likelihood*=theta2[self.names.index(i)*2*num_tar+obs[obs.index(value)-1],value]
@@ -262,14 +263,20 @@ class DataFusion(Human):
                     all_post[int((n-self.burn_in)/5),:,:]=postX.values()
                 # sample from X
                 X=np.random.choice(range(num_tar),p=postX.values())
-                alphas=copy.deepcopy(self.theta2_full)
+                alphas1=copy.deepcopy(self.theta1_full)
+                alphas2=copy.deepcopy(self.theta2_full)
+                theta1=copy.deepcopy(theta1_static)
                 theta2=copy.deepcopy(theta2_static)
+                # clac theta1 as if we knew X
+                alphas1[X,obs[0]]+=1
+                theta1[X,:]=np.random.dirichlet(alphas1[X,:])
                 # calc theta2 as if we knew X
                 for i in range(len(obs)-1):
-                    alphas[X,obs[i],obs[i+1]]+=1
+                    alphas2[X,obs[i],obs[i+1]]+=1
                 for j in range(theta2.shape[1]):
-                    theta2[X*2*num_tar+j,:]=np.random.dirichlet(alphas[X,j,:])
+                    theta2[X*2*num_tar+j,:]=np.random.dirichlet(alphas2[X,j,:])
                 if n%5==0:
+                    self.all_theta1[int((n-self.burn_in)/5),:,:]=theta1
                     self.all_theta2[int((n-self.burn_in)/5),:,:]=theta2
 
 
@@ -279,10 +286,12 @@ class DataFusion(Human):
 
         # using only theat1 on first observation
         else:
+            theta1=np.empty((num_tar,2*num_tar))
+            for X in range(num_tar):
+                theta1[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_full[X,:])
             for i in self.names:
                 # likelihood from theta1 (not full dist, assuming we know theta1)
-                index=self.select_param(self.names.index(i),obs[0])
-                likelihood=self.theta1[index]
+                likelihood=theta1[self.names.index(i),obs[0]]
                 postX[i]=self.probs[i]*likelihood
             # normalize and set final values
             suma=sum(postX.values())
@@ -291,7 +300,7 @@ class DataFusion(Human):
                 postX[i]=np.exp(postX[i])
             return postX.values()
 
-    def moment_matching_full(self):
+    def moment_matching_full(self,num_tar):
         # moment matching of alphas from samples (Minka, 2000)
         sample_counts=np.zeros((2*num_tar*num_tar,2*num_tar))
         for n in range(self.all_theta2.shape[1]):
@@ -314,6 +323,30 @@ class DataFusion(Human):
                         for w in range(5):
                             alphak-=((psi(alphak)-y)/polygamma(1,alphak))
                         self.theta2_full[int(n/(2*num_tar)),n%(2*num_tar),k]=alphak
+
+    def moment_matching_full_small(self,num_tar):
+        # moment matching of alphas from samples (Minka, 2000)
+        sample_counts=np.zeros((num_tar,2*num_tar))
+        for n in range(self.all_theta1.shape[1]):
+            sum_alpha=sum(self.theta1_full[int(n/(2*num_tar)),:])
+            for k in range(self.all_theta1.shape[2]):
+                samples=self.all_theta1[:,n,k]
+                if len(samples)==0:
+                    pass
+                else:
+                    sample_counts[n,k]=len(samples)
+                    current_alpha=self.theta1_full[int(n/(2*num_tar)),k]
+                    for x in range(5):
+                        sum_alpha_old=sum_alpha-current_alpha+self.theta1_full[int(n/(2*num_tar)),k]
+                        logpk=np.sum(np.log(samples))/len(samples)
+                        y=psi(sum_alpha_old)+logpk
+                        if y>=-2.22:
+                            alphak=np.exp(y)+0.5
+                        else:
+                            alphak=-1/(y+psi(1))
+                        for w in range(5):
+                            alphak-=((psi(alphak)-y)/polygamma(1,alphak))
+                        self.theta1_full[int(n/(2*num_tar)),k]=alphak
 
     def sampling_param_tied(self,num_tar,obs):
         postX=copy.deepcopy(self.probs)
@@ -339,9 +372,9 @@ class DataFusion(Human):
                     # lieklihood from theta1
                     index=self.select_param(self.names.index(i),obs[0])
                     if index%2==0:
-                        likelihood=self.theta1[index]
+                        likelihood=theta1[index]
                     else:
-                        likelihood=self.theta1[index]/(num_tar-1)
+                        likelihood=theta1[index]/(num_tar-1)
                     # likelihood from theta2
                     count=0
                     for value in obs[1:]:
@@ -392,10 +425,11 @@ class DataFusion(Human):
 
         # using only theat1 on first observation
         else:
+            theta1=scipy.stats.dirichlet.mean(alpha=self.theta1)
             for i in self.names:
                 # likelihood from theta1 (not full dist, assuming we know theta1)
                 index=self.select_param(self.names.index(i),obs[0])
-                likelihood=self.theta1[index]
+                likelihood=theta1[index]
                 postX[i]=self.probs[i]*likelihood
             # normalize and set final values
             suma=sum(postX.values())
@@ -450,7 +484,7 @@ class DataFusion(Human):
             if len(samples)==0:
                 pass
             else:
-                sample_counts[k]=len(samples)
+                sample_counts[0,k]=len(samples)
                 current_alpha=self.theta1[k]
                 for x in range(5):
                     sum_alpha_old=sum_alpha-current_alpha+self.theta1[k]
@@ -600,8 +634,10 @@ if __name__ == '__main__':
         param_tied_sim.DirPrior(num_tar,human_type)
     if graph_params['theta_val']:
         alphas_start=copy.deepcopy(param_tied_sim.theta2)
+        alphas1_start=copy.deepcopy(param_tied_sim.theta1)
     else:
         alphas_start=None
+        alphas1_start=None
 
     #running sim
     for n in tqdm(range(num_events),ncols=100):
@@ -730,11 +766,13 @@ if __name__ == '__main__':
             tied_number.append(count_tied)
             if count_full>1:
                 start=time.time()
-                full_sim.moment_matching_full()
+                full_sim.moment_matching_full(num_tar)
+                full_sim.moment_matching_full_small(num_tar)
                 full_match_times.append(time.time()-start)
             if count_tied>1:
                 start=time.time()
                 param_tied_sim.moment_matching()
+                param_tied_sim.moment_matching_small()
                 tied_match_times.append(time.time()-start)
 
             if graph_params['gibbs_val']:
@@ -758,8 +796,10 @@ if __name__ == '__main__':
 
             if count_full>1:
                 start=time.time()
-                full_sim.moment_matching_full()
+                full_sim.moment_matching_full(num_tar)
+                full_sim.moment_matching_full_small(num_tar)
                 full_match_times.append(time.time()-start)
+
         elif cfg['sim_types']['param_tied_dir']:
             param_tied_sim_probs=param_tied_sim.probs.values()
             count_tied=0
@@ -810,9 +850,13 @@ if __name__ == '__main__':
         #          theta2_full_alphas[X*2*num_tar+prev_obs,:]=full_sim.theta2_full[X,prev_obs,:]
         #  all_theta2_full[n,:,:]=theta2_full_alphas
     if graph_params['theta_val']:
+        theta1=param_tied_sim.theta1
+        theta1_correct=param_tied_sim.theta1_correct
         theta2=param_tied_sim.theta2
         theta2_correct=param_tied_sim.theta2_correct
     else:
+        theta1=None
+        theta1_correct=None
         theta2=None
         theta2_correct=None
     if graph_params['gibbs_val']:
@@ -839,5 +883,6 @@ if __name__ == '__main__':
             correct_percent_ml_full,correct_full,pred_percent_full,true_tar_tied,
             pred_tar_tied,correct_percent_tied,correct_percent_ml_tied,correct_tied,
             pred_percent_tied,theta2_correct,theta2_samples,X_samples,full_times,
-            tied_times,full_number,tied_number,full_match_times,tied_match_times)
+            tied_times,full_number,tied_number,full_match_times,tied_match_times,
+            alphas1_start,theta1,theta1_correct)
     plt.show()
