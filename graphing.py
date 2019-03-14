@@ -562,6 +562,7 @@ class Graphing():
         tied_match_std=np.std(tied_match_times)
         full_avg_num=np.mean(full_number)
         tied_avg_num=np.mean(tied_number)
+
         plt.figure()
         plt.bar(range(2),[tied_mean,full_mean],yerr=[full_std,tied_std])
         plt.title('Average Time for Gibbs Sampling (5000 samples)')
@@ -576,16 +577,16 @@ class Graphing():
 
         plt.figure()
         for i in range(int(tied_avg_num)):
-            plt.bar(0,tied_mean,color='C0',edgecolor='black',yerr=tied_std,bottom=i*tied_mean)
+            plt.bar(0,tied_mean,color='C0',edgecolor='black',bottom=i*tied_mean)
         for i in range(int(full_avg_num)):
-            plt.bar(1,full_mean,color='C0',edgecolor='black',yerr=full_std,bottom=i*full_mean)
-        plt.bar(0,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',yerr=tied_std,
+            plt.bar(1,full_mean,color='C0',edgecolor='black',bottom=i*full_mean)
+        plt.bar(0,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',
                 bottom=int(tied_avg_num)*tied_mean,label='sampling')
-        plt.bar(0,tied_match,color='C1',edgecolor='black',yerr=tied_match_std,
+        plt.bar(0,tied_match,color='C1',edgecolor='black',yerr=tied_match_std+tied_avg_num*tied_std,
                 bottom=tied_avg_num*tied_mean,label='moment match')
-        plt.bar(1,(full_avg_num%1*full_mean),color='C0',edgecolor='black',yerr=full_std,
+        plt.bar(1,(full_avg_num%1*full_mean),color='C0',edgecolor='black',
                 bottom=int(full_avg_num)*full_mean)
-        plt.bar(1,full_match,color='C1',edgecolor='black',yerr=full_match_std,
+        plt.bar(1,full_match,color='C1',edgecolor='black',yerr=full_match_std+full_avg_num*full_std,
                 bottom=full_avg_num*full_mean)
         plt.title('Average Total Time for Classification')
         plt.ylabel('Seconds')
