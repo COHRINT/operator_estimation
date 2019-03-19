@@ -26,7 +26,8 @@ class Graphing():
             pred_tar_tied=None,correct_percent_tied=None,correct_percent_ml_tied=None,correct_tied=None,
             pred_percent_tied=None,theta2_correct=None,theta2_samples=None,X_samples=None,full_times=None,
             tied_times=None,full_number=None,tied_number=None,full_match_times=None,tied_match_times=None,
-            alphas1_start=None,theta1=None,theta1_correct=None):
+            alphas1_start=None,theta1=None,theta1_correct=None,correct_percent_ind=None,true_tar_ind=None,
+            pred_tar_ind=None):
 
         self.gif_time=10 #seconds
 
@@ -71,6 +72,10 @@ class Graphing():
             print "Making Tied Sim Confusion Matrix"
             self.confusion(true_tar_tied,pred_tar_tied,style='target',
                     title='Tied Sim Target Confusion Matrix',filename='tied_tar_confusion')
+        if (true_tar_ind is not None) and (pred_tar_ind is not None):
+            print "Making Ind Sim Confusion Matrix"
+            self.confusion(true_tar_ind,pred_tar_ind,style='target',
+                    title='Ind Sim Target Confusion Matrix',filename='ind_tar_confusion')
         if (true_tar_tied is not None) and (pred_tar_ml is not None):
             print "Making ML Confusion Matrix"
             self.confusion(true_tar_tied,pred_tar_ml,style='target',
@@ -79,9 +84,20 @@ class Graphing():
             print "Making Operator Confusion Matrix"
             self.confusion(real_obs,pred_obs,style='obs',
                     title='Operator Confusion Matrix',filename='operator_confusion')
-        if (correct_percent_tied is not None) and (correct_percent_ml_tied is not None) and (correct_percent_full is not None):
+        if (correct_percent_tied is not None) and (correct_percent_ml_tied is not None) \
+                and (correct_percent_full is not None) and (correct_percent_ind is not None):
+            print "Making Percent Correct Plot"
+            self.percent_correct(num_events,correct_percent_tied,correct_percent_ml_tied,
+                    correct_percent_full,correct_percent_ind)
+        elif (correct_percent_tied is not None) and (correct_percent_ml_tied is not None) \
+                and (correct_percent_full is not None):
             print "Making Percent Correct Plot"
             self.percent_correct(num_events,correct_percent_tied,correct_percent_ml_tied,correct_percent_full)
+        elif (correct_percent_tied is not None) and (correct_percent_ml_tied is not None) \
+                and (correct_percent_ind is not None):
+            print "Making Percent Correct Plot"
+            self.percent_correct(num_events,correct_percent_tied,correct_percent_ml_tied,
+                    correct_percent_full,correct_percent_ind)
         elif (correct_percent_tied is not None) and (correct_percent_ml_tied is not None):
             print "Making Percent Correct Plot"
             self.percent_correct(num_events,correct_percent_tied,correct_percent_ml_tied)
@@ -162,7 +178,8 @@ class Graphing():
             elif i%2==1:
                 index=3 #tn
 
-            if (index==1) or (index==3):
+            #  if (index==1) or (index==3):
+            if (index==1):
                 breakdown[index].append((num_tar-1)*theta1_correct[i])
             else:
                 breakdown[index].append(theta1_correct[i])
@@ -331,11 +348,18 @@ class Graphing():
 
         fig.savefig('figures/'+filename+'.png',bbox_inches='tight',pad_inches=0)
 
-    def percent_correct(self,num_events,correct_percent,correct_percent_ml,correct_percent_full=None):
+    def percent_correct(self,num_events,correct_percent,correct_percent_ml,correct_percent_full=None,correct_percent_ind=None):
         fig=plt.figure()
-        if correct_percent_full is not None:
+        if (correct_percent_full is not None) and (correct_percent_ind is not None):
             plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
             plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind[5:], label="w/Human Total Correct (Ind)")
+        elif correct_percent_full is not None:
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
+        elif correct_percent_full is not None:
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind[5:], label="w/Human Total Correct (Ind)")
         else:
             plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct")
         plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml[5:], label="wo/Human Total Correct")

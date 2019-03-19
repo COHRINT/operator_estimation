@@ -28,13 +28,12 @@ warnings.filterwarnings("ignore",category=RuntimeWarning)
 warnings.filterwarnings("ignore",category=UserWarning)
 
 __author__ = "Jeremy Muesing"
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 __maintainer__ = "Jeremy Muesing"
 __email__ = "jeremy.muesing@colorado.edu"
 __status__ = "maintained"
 
 class Human():
-
     def DirPrior(self,num_tar,human="good"):
         #init for confusion matrix
         self.pred_obs=[]
@@ -73,6 +72,7 @@ class Human():
         table_full=np.swapaxes(table_full,1,2)
         
         self.theta1_full=base_table
+        self.theta1_ind=base_table
         self.theta2_full=table_full
 
         # theta2 real
@@ -230,7 +230,6 @@ class DataFusion(Human):
         # only learning theta2 on 2+ observations
         if len(obs)>1:
             # initialize Dir sample
-            sample_check=[]
             theta1_static=np.empty((num_tar,2*num_tar))
             theta2_static=np.empty((2*num_tar*num_tar,2*num_tar))
             all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
@@ -353,7 +352,6 @@ class DataFusion(Human):
         # only learning theta2 on 2+ observations
         if len(obs)>1:
             # initialize Dir sample
-            sample_check=[]
             theta1_static=np.empty((1,4))
             theta2_static=np.empty((4,4))
             all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
@@ -498,6 +496,72 @@ class DataFusion(Human):
                         alphak-=((psi(alphak)-y)/polygamma(1,alphak))
                     self.theta1[k]=alphak
 
+    def sampling_ind(self,num_tar,obs):
+        postX=copy.deepcopy(self.probs)
+        # initialize Dir sample
+        theta1_static=np.empty((num_tar,2*num_tar))
+        all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
+        self.theta1_ind_samples=np.zeros((int((self.num_samples-self.burn_in)/5),num_tar,2*num_tar))
+        for X in range(num_tar):
+            theta1_static[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_ind[X,:])
+
+        # begin gibbs sampling
+        theta1=copy.deepcopy(theta1_static)
+        for n in range(self.num_samples):
+            # calc X as if we knew theta2
+            for i in self.names:
+                likelihood=1
+                for value in obs:
+                    # likelihood from theta1
+                    likelihood*=theta1[self.names.index(i),value]
+                postX[i]=self.probs[i]*likelihood
+            # normalize
+            suma=sum(postX.values())
+            for i in self.names:
+                postX[i]=np.log(postX[i])-np.log(suma) 
+                postX[i]=np.exp(postX[i])
+            # store every 5th sample
+            if n%5==0:
+                all_post[int((n-self.burn_in)/5),:,:]=postX.values()
+            # sample from X
+            X=np.random.choice(range(num_tar),p=postX.values())
+            alphas1=copy.deepcopy(self.theta1_ind)
+            theta1=copy.deepcopy(theta1_static)
+            # clac theta1 as if we knew X
+            for i in range(len(obs)):
+                alphas1[X,obs[i]]+=1
+            theta1[X,:]=np.random.dirichlet(alphas1[X,:])
+            if n%5==0:
+                self.theta1_ind_samples[int((n-self.burn_in)/5),:]=theta1
+
+        # take max likelihood of X for next obs
+        post_probs=np.mean(all_post,axis=0)
+        return post_probs[0]
+
+    def moment_matching_ind(self,num_tar):
+        # moment matching of alphas from samples (Minka, 2000)
+        sample_counts=np.zeros((num_tar,2*num_tar))
+        for n in range(self.theta1_ind_samples.shape[1]):
+            sum_alpha=sum(self.theta1_ind[int(n/(2*num_tar)),:])
+            for k in range(self.theta1_ind_samples.shape[2]):
+                samples=self.theta1_ind_samples[:,n,k]
+                if len(samples)==0:
+                    pass
+                else:
+                    sample_counts[n,k]=len(samples)
+                    current_alpha=self.theta1_ind[int(n/(2*num_tar)),k]
+                    for x in range(5):
+                        sum_alpha_old=sum_alpha-current_alpha+self.theta1_ind[int(n/(2*num_tar)),k]
+                        logpk=np.sum(np.log(samples))/len(samples)
+                        y=psi(sum_alpha_old)+logpk
+                        if y>=-2.22:
+                            alphak=np.exp(y)+0.5
+                        else:
+                            alphak=-1/(y+psi(1))
+                        for w in range(5):
+                            alphak-=((psi(alphak)-y)/polygamma(1,alphak))
+                        self.theta1_ind[int(n/(2*num_tar)),k]=alphak
+
     def select_param(self,target,current_obs,prev_obs=None):
         # translate an observation about a target into its type of obs
         def select_index(tar,obs):
@@ -572,10 +636,6 @@ if __name__ == '__main__':
         correct_percent_full=[]
         correct_ml_full=[0]*num_events
         correct_percent_ml_full=[]
-        # timing
-        full_times=[]
-        full_number=[]
-        full_match_times=[]
     else:
         # target confusion matrix
         true_tar_full=None
@@ -600,10 +660,6 @@ if __name__ == '__main__':
         correct_percent_tied=[]
         correct_ml_tied=[0]*num_events
         correct_percent_ml_tied=[]
-        # timing
-        tied_times=[]
-        tied_number=[]
-        tied_match_times=[]
     else:
         # target confusion matrix
         true_tar_tied=None
@@ -616,6 +672,52 @@ if __name__ == '__main__':
         correct_percent_tied=None
         correct_ml_tied=None
         correct_percent_ml_tied=None
+    if graph_params['sim_results_ind']:
+        # target confusion matrix
+        true_tar_ind=[]
+        pred_tar_ind=[]
+        pred_tar_ind=[]
+        # precision recall
+        pred_percent_ind=[]
+        correct_ind=[0]*num_events
+        # running average
+        correct_percent_ind=[]
+        correct_ml_ind=[0]*num_events
+        correct_percent_ml_ind=[]
+    else:
+        # target confusion matrix
+        true_tar_ind=None
+        pred_tar_ind=None
+        pred_tar_ind=None
+        # precision recall
+        pred_percent_ind=None
+        correct_ind=None
+        # running average
+        correct_percent_ind=None
+        correct_ml_ind=None
+        correct_percent_ml_ind=None
+
+    if (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
+        # timing
+        full_times=[]
+        full_number=[]
+        full_match_times=[]
+        tied_times=[]
+        tied_number=[]
+        tied_match_times=[]
+        ind_times=[]
+        ind_number=[]
+        ind_match_times=[]
+    else:
+        full_times=None
+        full_number=None
+        full_match_times=None
+        tied_times=None
+        tied_number=None
+        tied_match_times=None
+        ind_times=None
+        ind_number=None
+        ind_match_times=None
     #  # human validation
     #  all_theta2_tied=np.empty((num_events,4,4))
     #  all_theta2_full=np.empty((num_events,2*num_tar*num_tar,2*num_tar))
@@ -632,6 +734,9 @@ if __name__ == '__main__':
     if cfg['sim_types']['param_tied_dir']:
         param_tied_sim=DataFusion()
         param_tied_sim.DirPrior(num_tar,human_type)
+    if cfg['sim_types']['ind_dir']:
+        ind_sim=DataFusion()
+        ind_sim.DirPrior(num_tar,human_type)
     if graph_params['theta_val']:
         alphas_start=copy.deepcopy(param_tied_sim.theta2)
         alphas1_start=copy.deepcopy(param_tied_sim.theta1)
@@ -647,7 +752,37 @@ if __name__ == '__main__':
 
         # getting a prior from ML
         if cfg['starting_dist']=='assist':
-            if (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
+            if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir'] and cfg['sim_types']['ind_dir']:
+                param_tied_sim.make_data(genus)
+                param_tied_sim.frame=0
+                param_tied_sim.alphas={}
+                param_tied_sim.probs={}
+                for i in param_tied_sim.names:
+                    param_tied_sim.alphas[i]=[-1,-1]
+                    param_tied_sim.probs[i]=.2
+                while max(param_tied_sim.probs.values())<0.6:
+                    param_tied_sim.updateProbsML()
+                    param_tied_sim.frame+=1
+                full_sim.probs=param_tied_sim.probs
+                ind_sim.probs=param_tied_sim.probs
+                chosen=np.argmax(param_tied_sim.probs.values())
+                if graph_params['sim_results_full']:
+                    if genus==chosen:
+                        correct_ml_full[n]=1
+                    correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
+                    pred_tar_full_ml.append(np.argmax(param_tied_sim.probs.values()))
+                if graph_params['sim_results_tied']:
+                    if genus==chosen:
+                        correct_ml_tied[n]=1
+                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+                    pred_tar_tied_ml.append(np.argmax(param_tied_sim.probs.values()))
+                if graph_params['sim_results_ind']:
+                    if genus==chosen:
+                        correct_ml_ind[n]=1
+                    correct_percent_ml_ind.append(sum(correct_ml_ind)/(n+1))
+                    pred_tar_ind.append(np.argmax(param_tied_sim.probs.values()))
+
+            elif cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir']:
                 param_tied_sim.make_data(genus)
                 param_tied_sim.frame=0
                 param_tied_sim.alphas={}
@@ -671,7 +806,31 @@ if __name__ == '__main__':
                     correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
                     pred_tar_tied_ml.append(np.argmax(param_tied_sim.probs.values()))
 
-            elif (cfg['sim_types']['full_dir']) and not (cfg['sim_types']['param_tied_dir']):
+            elif cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['ind_dir']:
+                param_tied_sim.make_data(genus)
+                param_tied_sim.frame=0
+                param_tied_sim.alphas={}
+                param_tied_sim.probs={}
+                for i in param_tied_sim.names:
+                    param_tied_sim.alphas[i]=[-1,-1]
+                    param_tied_sim.probs[i]=.2
+                while max(param_tied_sim.probs.values())<0.6:
+                    param_tied_sim.updateProbsML()
+                    param_tied_sim.frame+=1
+                ind_sim.probs=param_tied_sim.probs
+                chosen=np.argmax(param_tied_sim.probs.values())
+                if graph_params['sim_results_ind']:
+                    if genus==chosen:
+                        correct_ml_ind[n]=1
+                    correct_percent_ml_ind.append(sum(correct_ml_ind)/(n+1))
+                    pred_tar_ind_ml.append(np.argmax(param_tied_sim.probs.values()))
+                if graph_params['sim_results_tied']:
+                    if genus==chosen:
+                        correct_ml_tied[n]=1
+                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+                    pred_tar_tied_ml.append(np.argmax(param_tied_sim.probs.values()))
+
+            elif cfg['sim_types']['full_dir']:
                 full_sim.make_data(genus)
                 full_sim.frame=0
                 full_sim.alphas={}
@@ -689,7 +848,7 @@ if __name__ == '__main__':
                     correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
                     pred_tar_full_ml.append(np.argmax(full_sim.probs.values()))
 
-            elif not (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
+            elif cfg['sim_types']['param_tied_dir']:
                 param_tied_sim.make_data(genus)
                 param_tied_sim.frame=0
                 param_tied_sim.alphas={}
@@ -743,7 +902,50 @@ if __name__ == '__main__':
 
         obs=[]
         start_tar=time.time()
-        if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir']:
+        if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir'] and cfg['sim_types']['ind_dir']:
+            full_sim_probs=full_sim.probs.values()
+            ind_sim_probs=full_sim.probs.values()
+            param_tied_sim_probs=param_tied_sim.probs.values()
+            count_full=0
+            count_tied=0
+            count_ind=0
+            while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold) or (max(ind_sim_probs)<threshold):
+                if time.time()-start_tar>20:
+                    break
+                obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
+                if max(full_sim_probs)<threshold:
+                    start=time.time()
+                    full_sim_probs=full_sim.sampling_full(num_tar,obs)
+                    full_times.append(time.time()-start)
+                    count_full+=1
+                if max(param_tied_sim_probs)<threshold:
+                    start=time.time()
+                    param_tied_sim_probs=param_tied_sim.sampling_param_tied(num_tar,obs)
+                    tied_times.append(time.time()-start)
+                    count_tied+=1
+                if max(ind_sim_probs)<threshold:
+                    start=time.time()
+                    ind_sim_probs=ind_sim.sampling_ind(num_tar,obs)
+                    ind_times.append(time.time()-start)
+                    count_ind+=1
+            full_number.append(count_full)
+            tied_number.append(count_tied)
+            ind_number.append(count_ind)
+            if count_full>1:
+                start=time.time()
+                full_sim.moment_matching_full(num_tar)
+                full_sim.moment_matching_full_small(num_tar)
+                full_match_times.append(time.time()-start)
+            if count_tied>1:
+                start=time.time()
+                param_tied_sim.moment_matching()
+                param_tied_sim.moment_matching_small()
+                tied_match_times.append(time.time()-start)
+            start=time.time()
+            ind_sim.moment_matching_ind(num_tar)
+            ind_match_times.append(time.time()-start)
+
+        elif cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir']:
             full_sim_probs=full_sim.probs.values()
             param_tied_sim_probs=param_tied_sim.probs.values()
             count_full=0
@@ -775,14 +977,35 @@ if __name__ == '__main__':
                 param_tied_sim.moment_matching_small()
                 tied_match_times.append(time.time()-start)
 
-            if graph_params['gibbs_val']:
-                # need a run where all 16 have been sampled, keep storing until a run produces that
-                if count_tied>1:
-                    for i in range(4):
-                        for j in range(4):
-                            samples=param_tied_sim.theta2_samples[np.nonzero(param_tied_sim.theta2_samples[:,i,j]),i,j]
-                            if len(samples[0])>len(theta2_samples[i*4+j]):
-                                theta2_samples[i*4+j]=samples[0]
+        elif cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['ind_dir']:
+            ind_sim_probs=ind_sim.probs.values()
+            param_tied_sim_probs=param_tied_sim.probs.values()
+            count_ind=0
+            count_tied=0
+            while (max(ind_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold):
+                if time.time()-start_tar>20:
+                    break
+                obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
+                if max(ind_sim_probs)<threshold:
+                    start=time.time()
+                    ind_sim_probs=ind_sim.sampling_ind(num_tar,obs)
+                    ind_times.append(time.time()-start)
+                    count_ind+=1
+                if max(param_tied_sim_probs)<threshold:
+                    start=time.time()
+                    param_tied_sim_probs=param_tied_sim.sampling_param_tied(num_tar,obs)
+                    tied_times.append(time.time()-start)
+                    count_tied+=1
+            ind_number.append(count_ind)
+            tied_number.append(count_tied)
+            start=time.time()
+            ind_sim.moment_matching_ind(num_tar)
+            ind_match_times.append(time.time()-start)
+            if count_tied>1:
+                start=time.time()
+                param_tied_sim.moment_matching()
+                param_tied_sim.moment_matching_small()
+                tied_match_times.append(time.time()-start)
 
         elif cfg['sim_types']['full_dir']:
             full_sim_probs=full_sim.probs.values()
@@ -795,10 +1018,8 @@ if __name__ == '__main__':
                 count_full+=1
 
             if count_full>1:
-                start=time.time()
                 full_sim.moment_matching_full(num_tar)
                 full_sim.moment_matching_full_small(num_tar)
-                full_match_times.append(time.time()-start)
 
         elif cfg['sim_types']['param_tied_dir']:
             param_tied_sim_probs=param_tied_sim.probs.values()
@@ -811,10 +1032,8 @@ if __name__ == '__main__':
                 count_tied+=1
 
             if count_tied>1:
-                start=time.time()
                 param_tied_sim.moment_matching()
                 param_tied_sim.moment_matching_small()
-                tied_match_times.append(time.time()-start)
 
             if graph_params['gibbs_val']:
                 # need a run where all 16 have been sampled, keep storing until a run produces that
@@ -843,6 +1062,15 @@ if __name__ == '__main__':
             if genus==np.argmax(param_tied_sim_probs):
                 correct_tied[n]=1
             correct_percent_tied.append(sum(correct_tied)/(n+1))
+        if graph_params['sim_results_ind']:
+            # building graphing parameters
+            chosen=max(ind_sim_probs)
+            pred_percent_ind.append(chosen)
+            true_tar_ind.append(genus)
+            pred_tar_ind.append(np.argmax(ind_sim_probs))
+            if genus==np.argmax(ind_sim_probs):
+                correct_ind[n]=1
+            correct_percent_ind.append(sum(correct_ind)/(n+1))
         #  all_theta2_tied[n,:,:]=param_tied_sim.theta2
         #  theta2_full_alphas=np.empty((2*num_tar*num_tar,2*num_tar))
         #  for X in range(num_tar):
@@ -884,5 +1112,6 @@ if __name__ == '__main__':
             pred_tar_tied,correct_percent_tied,correct_percent_ml_tied,correct_tied,
             pred_percent_tied,theta2_correct,theta2_samples,X_samples,full_times,
             tied_times,full_number,tied_number,full_match_times,tied_match_times,
-            alphas1_start,theta1,theta1_correct)
+            alphas1_start,theta1,theta1_correct,correct_percent_ind,true_tar_ind,
+            pred_tar_ind)
     plt.show()

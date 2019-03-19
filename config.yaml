@@ -6,10 +6,14 @@ human: 'bad'
 sim_types:
     param_tied_dir: True
     full_dir: True
+    # can't run ind without param tied
+    ind_dir: True
 graphs:
     theta_val: True
     gibbs_val: False
     sim_results_full: True
     sim_results_tied: True
+    sim_results_ind: True
     human_val: False
     convergence: False
+    timing: True
