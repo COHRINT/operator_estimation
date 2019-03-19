@@ -27,7 +27,7 @@ class Graphing():
             pred_percent_tied=None,theta2_correct=None,theta2_samples=None,X_samples=None,full_times=None,
             tied_times=None,full_number=None,tied_number=None,full_match_times=None,tied_match_times=None,
             alphas1_start=None,theta1=None,theta1_correct=None,correct_percent_ind=None,true_tar_ind=None,
-            pred_tar_ind=None):
+            pred_tar_ind=None,ind_times=None,ind_number=None,ind_match_times=None):
 
         self.gif_time=10 #seconds
 
@@ -42,9 +42,13 @@ class Graphing():
             print "Making Gibbs Validation Plots"
             #  self.gibbs_validation(num_tar,theta2_samples,X_samples)
             self.gibbs_validation(num_tar,theta2_samples)
-        if (full_times is not None) and (tied_times is not None):
+        if (full_times is not None) and (tied_times is not None) and (ind_times is not None):
             print "Making Timing Comparison"
-            self.timing(full_times,tied_times,full_number,tied_number,full_match_times,tied_match_times)
+            self.timing(tied_times,tied_number,tied_match_times,full_times,full_number,
+                    full_match_times,ind_times,ind_number,ind_match_times)
+        elif (full_times is not None) and (tied_times is not None):
+            self.timing(tied_times,tied_number,tied_match_times,full_times,full_number,
+                    full_match_times)
         #  # TODO: chang ethese conditions, only care about percent correct for full
         #  condition_full=((true_tar_full is not None) and (pred_tar_full is not None) and
         #          (real_obs is not None) and (pred_obs is not None) and
@@ -357,7 +361,7 @@ class Graphing():
         elif correct_percent_full is not None:
             plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
             plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
-        elif correct_percent_full is not None:
+        elif correct_percent_ind is not None:
             plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
             plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind[5:], label="w/Human Total Correct (Ind)")
         else:
@@ -575,46 +579,101 @@ class Graphing():
         fig.clear()
         plt.close()
 
-    def timing(self,full_times,tied_times,full_number,tied_number,full_match_times,tied_match_times):
-        full_mean=np.mean(full_times)
-        full_std=np.std(full_times)
-        full_match=np.mean(full_match_times)
-        full_match_std=np.std(full_match_times)
+    def timing(self,tied_times,tied_number,tied_match_times,full_times=None,full_number=None,
+            full_match_times=None,ind_times=None,ind_number=None,ind_match_times=None):
+        if full_times is not None:
+            full_mean=np.mean(full_times)
+            full_std=np.std(full_times)
+            full_match=np.mean(full_match_times)
+            full_match_std=np.std(full_match_times)
+            full_avg_num=np.mean(full_number)
+        if ind_times is not None:
+            ind_mean=np.mean(ind_times)
+            ind_std=np.std(ind_times)
+            ind_match=np.mean(ind_match_times)
+            ind_match_std=np.std(ind_match_times)
+            ind_avg_num=np.mean(ind_number)
         tied_mean=np.mean(tied_times)
         tied_std=np.std(tied_times)
         tied_match=np.mean(tied_match_times)
         tied_match_std=np.std(tied_match_times)
-        full_avg_num=np.mean(full_number)
         tied_avg_num=np.mean(tied_number)
 
         plt.figure()
-        plt.bar(range(2),[tied_mean,full_mean],yerr=[full_std,tied_std])
+        if (full_times is not None) and (ind_times is not None):
+            plt.bar(range(3),[ind_mean,tied_mean,full_mean],yerr=[ind_std,full_std,tied_std])
+            plt.xticks(range(3),('Ind','Tied','Full'))
+        elif full_times is not None:
+            plt.bar(range(2),[tied_mean,full_mean],yerr=[full_std,tied_std])
+            plt.xticks(range(2),('Tied','Full'))
+        elif ind_times is not None:
+            plt.bar(range(2),[tied_mean,ind_mean],yerr=[ind_std,tied_std])
+            plt.xticks(range(2),('Tied','Ind'))
         plt.title('Average Time for Gibbs Sampling (5000 samples)')
         plt.ylabel('Seconds')
-        plt.xticks(range(2),('Tied','Full'))
 
         plt.figure()
-        plt.bar(range(2),[tied_match,full_match],yerr=[tied_match_std,full_match_std],color='C1')
+        if (full_match is not None) and (ind_match is not None):
+            plt.bar(range(3),[ind_match,tied_match,full_match],yerr=[ind_match_std,tied_match_std,full_match_std],color='C1')
+            plt.xticks(range(3),('Ind','Tied','Full'))
+        elif full_match is not None:
+            plt.bar(range(2),[tied_match,full_match],yerr=[tied_match_std,full_match_std],color='C1')
+            plt.xticks(range(2),('Tied','Full'))
+        elif ind_match is not None:
+            plt.bar(range(2),[tied_match,ind_match],yerr=[tied_match_std,ind_match_std],color='C1')
+            plt.xticks(range(2),('Tied','Ind'))
         plt.title('Average Time for Moment Matching')
         plt.ylabel('Seconds')
-        plt.xticks(range(2),('Tied','Full'))
 
         plt.figure()
-        for i in range(int(tied_avg_num)):
-            plt.bar(0,tied_mean,color='C0',edgecolor='black',bottom=i*tied_mean)
-        for i in range(int(full_avg_num)):
-            plt.bar(1,full_mean,color='C0',edgecolor='black',bottom=i*full_mean)
-        plt.bar(0,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',
-                bottom=int(tied_avg_num)*tied_mean,label='sampling')
-        plt.bar(0,tied_match,color='C1',edgecolor='black',yerr=tied_match_std+tied_avg_num*tied_std,
-                bottom=tied_avg_num*tied_mean,label='moment match')
-        plt.bar(1,(full_avg_num%1*full_mean),color='C0',edgecolor='black',
-                bottom=int(full_avg_num)*full_mean)
-        plt.bar(1,full_match,color='C1',edgecolor='black',yerr=full_match_std+full_avg_num*full_std,
-                bottom=full_avg_num*full_mean)
+        if (full_times is not None) and (ind_times is not None):
+            for i in range(int(tied_avg_num)):
+                plt.bar(1,tied_mean,color='C0',edgecolor='black',bottom=i*tied_mean)
+            plt.bar(1,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',
+                    bottom=int(tied_avg_num)*tied_mean,label='sampling')
+            plt.bar(1,tied_match,color='C1',edgecolor='black',yerr=tied_match_std+tied_avg_num*tied_std,
+                    bottom=tied_avg_num*tied_mean,label='moment match')
+        else:
+            for i in range(int(tied_avg_num)):
+                plt.bar(0,tied_mean,color='C0',edgecolor='black',bottom=i*tied_mean)
+            plt.bar(0,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',
+                    bottom=int(tied_avg_num)*tied_mean,label='sampling')
+            plt.bar(0,tied_match,color='C1',edgecolor='black',yerr=tied_match_std+tied_avg_num*tied_std,
+                    bottom=tied_avg_num*tied_mean,label='moment match')
+
+        if (full_times is not None) and (ind_times is not None):
+            for i in range(int(ind_avg_num)):
+                plt.bar(0,ind_mean,color='C0',edgecolor='black',bottom=i*ind_mean)
+            for i in range(int(full_avg_num)):
+                plt.bar(2,full_mean,color='C0',edgecolor='black',bottom=i*full_mean)
+            plt.bar(2,(full_avg_num%1*full_mean),color='C0',edgecolor='black',
+                    bottom=int(full_avg_num)*full_mean)
+            plt.bar(2,full_match,color='C1',edgecolor='black',yerr=full_match_std+full_avg_num*full_std,
+                    bottom=full_avg_num*full_mean)
+            plt.bar(0,(ind_avg_num%1*ind_mean),color='C0',edgecolor='black',
+                    bottom=int(ind_avg_num)*ind_mean)
+            plt.bar(0,ind_match,color='C1',edgecolor='black',yerr=ind_match_std+ind_avg_num*ind_std,
+                    bottom=ind_avg_num*ind_mean)
+            plt.xticks(range(3),('Ind','Tied','Full'))
+        elif full_match is not None:
+            for i in range(int(full_avg_num)):
+                plt.bar(1,full_mean,color='C0',edgecolor='black',bottom=i*full_mean)
+            plt.bar(1,(full_avg_num%1*full_mean),color='C0',edgecolor='black',
+                    bottom=int(full_avg_num)*full_mean)
+            plt.bar(1,full_match,color='C1',edgecolor='black',yerr=full_match_std+full_avg_num*full_std,
+                    bottom=full_avg_num*full_mean)
+            plt.xticks(range(2),('Tied','Full'))
+        elif ind_times is not None:
+            for i in range(int(ind_avg_num)):
+                plt.bar(0,ind_mean,color='C0',edgecolor='black',bottom=i*ind_mean)
+            plt.bar(1,(ind_avg_num%1*ind_mean),color='C0',edgecolor='black',
+                    bottom=int(ind_avg_num)*ind_mean)
+            plt.bar(1,ind_match,color='C1',edgecolor='black',yerr=ind_match_std+ind_avg_num*ind_std,
+                    bottom=ind_avg_num*ind_mean)
+            plt.xticks(range(2),('Tied','Ind'))
+
         plt.title('Average Total Time for Classification')
         plt.ylabel('Seconds')
-        plt.xticks(range(2),('Tied','Full'))
         plt.legend()
 
 
