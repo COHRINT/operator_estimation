@@ -172,13 +172,13 @@ if __name__ == '__main__':
 
     # start sim
     if cfg['sim_types']['full_dir']:
-        full_sim=DataFusion()
+        full_sim=DataFusion(num_tar)
         full_sim.DirPrior(num_tar,human_type)
     if cfg['sim_types']['param_tied_dir']:
-        param_tied_sim=DataFusion()
+        param_tied_sim=DataFusion(num_tar)
         param_tied_sim.DirPrior(num_tar,human_type)
     if cfg['sim_types']['ind_dir']:
-        ind_sim=DataFusion()
+        ind_sim=DataFusion(num_tar)
         ind_sim.DirPrior(num_tar,human_type)
     if graph_params['theta_val']:
         alphas_start=copy.deepcopy(param_tied_sim.theta2)

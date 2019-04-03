@@ -389,6 +389,21 @@ class Cumuliform(FamilyContainer):
                 elif(self.genus == 4):
                         stageSets = [0,5,45,60,100];
                         vals = [5,4.5,0.5,3];
+                elif(self.genus==5):
+                        stageSets = [0,15,55,70,100];
+                        vals = [3.5,4,5.5,11];
+                elif(self.genus == 6):
+                        stageSets = [0,10,45,75,100];
+                        vals = [8,3,4.5,7];
+                elif(self.genus == 7):
+                        stageSets = [0,5,40,75,100];
+                        vals = [5,7,1.5,4.5];
+                elif(self.genus == 8):
+                        stageSets = [0,20,50,65,100];
+                        vals = [4.5,10,2,7.5];
+                elif(self.genus == 9):
+                        stageSets = [0,5,40,70,100];
+                        vals = [6,3.5,0.5,5.5];
 
                 #  if(self.genus==0):
                 #          stageSets = [0,5,50,60,100];

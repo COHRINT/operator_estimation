@@ -162,13 +162,19 @@ class Human():
 
 
 class DataFusion(Human):
-    def __init__(self):
+    def __init__(self,num_tar):
         self.hmm=HMM_Classification()
         self.num_samples=5000
         self.burn_in=1000
-        modelFileName = 'HMM/hmm_train.npy'
+        if num_tar==10:
+            modelFileName = 'HMM/hmm_train_10.npy'
+        else:
+            modelFileName = 'HMM/hmm_train.npy'
         self.hmm_models = np.load(modelFileName).item()
-        self.names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
+        self.names=[]
+        for i in range(num_tar):
+            self.names.append('Cumuliform'+str(i))
+        #  self.names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
         self.alphas={}
         self.sampling_data=True
 

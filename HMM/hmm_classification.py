@@ -21,11 +21,10 @@ class HMM_Classification():
         pass
         #  self.models = loadModels(modelFileName)
 
-    def buildModels(self, dataSet, saveFileName='hmm_train.npy'):
-
+    def buildModels(self, dataSet, num_tar=5,saveFileName='hmm_train.npy'):
         histModels = {}
         warnings.filterwarnings("ignore")
-        for i in tqdm(range(5),ncols=100):
+        for i in tqdm(range(num_tar),ncols=100):
             allTypeData = []
             allTypeLengths = []
             currentSet = dataSet[i]
@@ -51,17 +50,23 @@ class HMM_Classification():
             model_store['obs'] = obs
 
             histModels['Cumuliform'+str(i)] = model_store
+        if num_tar==10:
+            np.save('hmm_train_10.npy',histModels)
+        else:
+            np.save(saveFileName,histModels)
 
-        np.save(saveFileName,histModels)
-
-    def buildDataSet(self, num_sets=100):
-        subs=[str(i) for i in range(5)]
-        allSeries=[[],[],[],[],[]]
-        for i in range(5):
+    def buildDataSet(self, num_sets=100, num_tar=5):
+        if num_tar==10:
+            allSeries=[[],[],[],[],[],[],[],[],[],[]]
+            var=0.5
+        else:
+            allSeries=[[],[],[],[],[]]
+            var=2
+        for i in range(num_tar):
             model=Cumuliform(genus=i,weather=False)
             b=copy.deepcopy(model.intensityModel)
             for j in range(num_sets):
-                c=b+np.random.normal(0,2,(len(b)))
+                c=b+np.random.normal(0,var,(len(b)))
                 for k in range(len(c)):
                     c[k]=max(c[k],1e-5)
                 allSeries[i].append(c)
@@ -84,14 +89,20 @@ class HMM_Classification():
             newAlpha[xcur] = newAlpha[xcur]*pyx[xcur].pointEval(newData)
         return newAlpha
 
-    def testHMM(self,num_tar):
-        modelFileName = 'hmm_train.npy'
+    def testHMM(self,num_events,num_tar=5):
+        if num_tar==10:
+            modelFileName = 'hmm_train_10.npy'
+        else:
+            modelFileName = 'hmm_train.npy'
         models = np.load(modelFileName).item()
 
-        genNames = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
+        genNames=[]
+        for i in range(num_tar):
+            genNames.append('Cumuliform'+str(i))
+        #  genNames = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
         correct=0
         #  for i in range(num_tar):
-        for i in tqdm(range(num_tar),ncols=100):
+        for i in tqdm(range(num_events),ncols=100):
             genus=np.random.randint(5)
             #  genus=0
             species = Cumuliform(genus = genus,weather=False)
@@ -133,8 +144,8 @@ if __name__ == '__main__':
         commands.append(sys.argv[i])
 
     if 'train' in commands:
-        dataSet=hc.buildDataSet(100)
-        hc.buildModels(dataSet)
+        dataSet=hc.buildDataSet(100,10)
+        hc.buildModels(dataSet,10)
 
     if 'test' in commands:
-        hc.testHMM(500)
+        hc.testHMM(500,10)
