@@ -366,7 +366,7 @@ class Graphing():
             plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind[5:], label="w/Human Total Correct (Ind)")
         else:
             plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct")
-        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml[5:], label="wo/Human Total Correct")
+        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml[5:], label="No Human Total Correct")
         plt.legend()
         plt.xlabel('Number of Targets')
         plt.ylabel('Percent Correct')
