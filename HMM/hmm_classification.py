@@ -58,7 +58,7 @@ class HMM_Classification():
     def buildDataSet(self, num_sets=100, num_tar=5):
         if num_tar==10:
             allSeries=[[],[],[],[],[],[],[],[],[],[]]
-            var=0.5
+            var=0.1
         else:
             allSeries=[[],[],[],[],[]]
             var=2
@@ -118,7 +118,7 @@ class HMM_Classification():
                 probs[i] = .2
             
             count=0
-            while max(probs.values())<0.6:
+            while max(probs.values())<0.4:
                     #update classification probs
                     for i in genNames:
                         alphas[i] = self.continueForward(data[count], models[i], alphas[i])
@@ -144,7 +144,7 @@ if __name__ == '__main__':
         commands.append(sys.argv[i])
 
     if 'train' in commands:
-        dataSet=hc.buildDataSet(100,10)
+        dataSet=hc.buildDataSet(500,10)
         hc.buildModels(dataSet,10)
 
     if 'test' in commands:

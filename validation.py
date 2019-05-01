@@ -160,12 +160,18 @@ class Human():
 
         return obs
 
+    def HumanAnswer(self,num_tar,tar_asked,real_target,obs):
+        prev_obs=obs[-1]
+        prob=self.theta2_correct[real_target*2*num_tar+prev_obs,2*tar_asked:2*tar_asked+2]
+        obs.append(np.random.choice([2*tar_asked,2*tar_asked+1],p=prob/sum(prob)))
+        return obs
+
 
 class DataFusion(Human):
     def __init__(self,num_tar):
         self.hmm=HMM_Classification()
-        self.num_samples=5000
-        self.burn_in=1000
+        #  self.num_samples=5000
+        #  self.burn_in=1000
         if num_tar==10:
             modelFileName = 'HMM/hmm_train_10.npy'
         else:
@@ -223,16 +229,16 @@ class DataFusion(Human):
         for i in self.names:
             self.probs[i]/=suma
 
-    def sampling_full(self,num_tar,obs):
+    def sampling_full(self,num_tar,obs,num_samples=5000,burn_in=1000):
         postX=copy.deepcopy(self.probs)
         # only learning theta2 on 2+ observations
         if len(obs)>1:
             # initialize Dir sample
             theta1_static=np.empty((num_tar,2*num_tar))
             theta2_static=np.empty((2*num_tar*num_tar,2*num_tar))
-            all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
-            self.all_theta1=np.zeros((int((self.num_samples-self.burn_in)/5),num_tar,2*num_tar))
-            self.all_theta2=np.zeros((int((self.num_samples-self.burn_in)/5),2*num_tar*num_tar,2*num_tar))
+            all_post=np.zeros((int((num_samples-burn_in)/5),1,num_tar))
+            self.all_theta1=np.zeros((int((num_samples-burn_in)/5),num_tar,2*num_tar))
+            self.all_theta2=np.zeros((int((num_samples-burn_in)/5),2*num_tar*num_tar,2*num_tar))
             for X in range(num_tar):
                 theta1_static[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_full[X,:])
                 for prev_obs in range(2*num_tar):
@@ -241,7 +247,7 @@ class DataFusion(Human):
             # begin gibbs sampling
             theta2=copy.deepcopy(theta2_static)
             theta1=copy.deepcopy(theta1_static)
-            for n in range(self.num_samples):
+            for n in range(num_samples):
                 # calc X as if we knew theta2
                 for i in self.names:
                     # likelihood from theta1
@@ -257,7 +263,7 @@ class DataFusion(Human):
                     postX[i]=np.exp(postX[i])
                 # store every 5th sample
                 if n%5==0:
-                    all_post[int((n-self.burn_in)/5),:,:]=postX.values()
+                    all_post[int((n-burn_in)/5),:,:]=postX.values()
                 # sample from X
                 X=np.random.choice(range(num_tar),p=postX.values())
                 alphas1=copy.deepcopy(self.theta1_full)
@@ -273,8 +279,8 @@ class DataFusion(Human):
                 for j in range(theta2.shape[1]):
                     theta2[X*2*num_tar+j,:]=np.random.dirichlet(alphas2[X,j,:])
                 if n%5==0:
-                    self.all_theta1[int((n-self.burn_in)/5),:,:]=theta1
-                    self.all_theta2[int((n-self.burn_in)/5),:,:]=theta2
+                    self.all_theta1[int((n-burn_in)/5),:,:]=theta1
+                    self.all_theta2[int((n-burn_in)/5),:,:]=theta2
 
 
             # take max likelihood of X for next obs
@@ -345,16 +351,16 @@ class DataFusion(Human):
                             alphak-=((psi(alphak)-y)/polygamma(1,alphak))
                         self.theta1_full[int(n/(2*num_tar)),k]=alphak
 
-    def sampling_param_tied(self,num_tar,obs):
+    def sampling_param_tied(self,num_tar,obs,num_samples=5000,burn_in=1000):
         postX=copy.deepcopy(self.probs)
         # only learning theta2 on 2+ observations
         if len(obs)>1:
             # initialize Dir sample
             theta1_static=np.empty((1,4))
             theta2_static=np.empty((4,4))
-            all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
-            self.theta1_samples=np.zeros((int((self.num_samples-self.burn_in)/5),4))
-            self.theta2_samples=np.zeros((int((self.num_samples-self.burn_in)/5),4,4))
+            all_post=np.zeros((int((num_samples-burn_in)/5),1,num_tar))
+            self.theta1_samples=np.zeros((int((num_samples-burn_in)/5),4))
+            self.theta2_samples=np.zeros((int((num_samples-burn_in)/5),4,4))
             theta1_static=scipy.stats.dirichlet.mean(alpha=self.theta1)
             for i in range(4):
                 theta2_static[i,:]=scipy.stats.dirichlet.mean(alpha=self.theta2[i,:])
@@ -362,7 +368,7 @@ class DataFusion(Human):
             # begin gibbs sampling
             theta1=copy.deepcopy(theta1_static)
             theta2=copy.deepcopy(theta2_static)
-            for n in range(self.num_samples):
+            for n in range(num_samples):
                 # calc X as if we knew theta2
                 for i in self.names:
                     # lieklihood from theta1
@@ -388,7 +394,7 @@ class DataFusion(Human):
                     postX[i]=np.exp(postX[i])
                 # store every 5th sample
                 if n%5==0:
-                    all_post[int((n-self.burn_in)/5),:,:]=postX.values()
+                    all_post[int((n-burn_in)/5),:,:]=postX.values()
                 # sample from X
                 X=np.random.choice(range(num_tar),p=postX.values())
                 alphas1=copy.deepcopy(self.theta1)
@@ -405,8 +411,8 @@ class DataFusion(Human):
                 for j in range(4):
                     theta2[j,:]=np.random.dirichlet(alphas2[j,:])
                 if n%5==0:
-                    self.theta1_samples[int((n-self.burn_in)/5),:]=theta1
-                    self.theta2_samples[int((n-self.burn_in)/5),:,:]=theta2
+                    self.theta1_samples[int((n-burn_in)/5),:]=theta1
+                    self.theta2_samples[int((n-burn_in)/5),:,:]=theta2
 
             # storing data for graphs
             if max(postX.values())<0.5:
@@ -494,18 +500,18 @@ class DataFusion(Human):
                         alphak-=((psi(alphak)-y)/polygamma(1,alphak))
                     self.theta1[k]=alphak
 
-    def sampling_ind(self,num_tar,obs):
+    def sampling_ind(self,num_tar,obs,num_samples=5000,burn_in=1000):
         postX=copy.deepcopy(self.probs)
         # initialize Dir sample
         theta1_static=np.empty((num_tar,2*num_tar))
-        all_post=np.zeros((int((self.num_samples-self.burn_in)/5),1,num_tar))
-        self.theta1_ind_samples=np.zeros((int((self.num_samples-self.burn_in)/5),num_tar,2*num_tar))
+        all_post=np.zeros((int((num_samples-burn_in)/5),1,num_tar))
+        self.theta1_ind_samples=np.zeros((int((num_samples-burn_in)/5),num_tar,2*num_tar))
         for X in range(num_tar):
             theta1_static[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_ind[X,:])
 
         # begin gibbs sampling
         theta1=copy.deepcopy(theta1_static)
-        for n in range(self.num_samples):
+        for n in range(num_samples):
             # calc X as if we knew theta2
             for i in self.names:
                 likelihood=1
@@ -520,7 +526,7 @@ class DataFusion(Human):
                 postX[i]=np.exp(postX[i])
             # store every 5th sample
             if n%5==0:
-                all_post[int((n-self.burn_in)/5),:,:]=postX.values()
+                all_post[int((n-burn_in)/5),:,:]=postX.values()
             # sample from X
             X=np.random.choice(range(num_tar),p=postX.values())
             alphas1=copy.deepcopy(self.theta1_ind)
@@ -530,7 +536,7 @@ class DataFusion(Human):
                 alphas1[X,obs[i]]+=1
             theta1[X,:]=np.random.dirichlet(alphas1[X,:])
             if n%5==0:
-                self.theta1_ind_samples[int((n-self.burn_in)/5),:]=theta1
+                self.theta1_ind_samples[int((n-burn_in)/5),:]=theta1
 
         # take max likelihood of X for next obs
         post_probs=np.mean(all_post,axis=0)
@@ -583,3 +589,59 @@ class DataFusion(Human):
         else:
             index=select_index(target,current_obs)
             return index
+
+    def VOI(self,num_tar,obs,threshold):
+        post=copy.deepcopy(self.probs.values())
+        R=np.zeros((num_tar,num_tar*2))
+        VOI=np.zeros(num_tar)
+        obs_probs=np.empty((2*num_tar*num_tar,2*num_tar))
+        # create our p(o'|o,X,theta_2)
+        for X in range(num_tar):
+            for prev_obs in range(2*num_tar):
+                obs_probs[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
+        # we must marginalize out the target types
+        sum_tar=np.zeros(2*num_tar)
+        for X in range(num_tar):
+            # don't forget to mul by our probs
+            sum_tar=np.sum([sum_tar,post[X]*obs_probs[obs[-1]+X*2*num_tar,:]],axis=0)
+        # normalize
+        obs_probs_no_state=sum_tar/np.sum(sum_tar)
+
+        # small samples of what would happend if an observation was really given
+        for i in range(num_tar*2):
+            theory_obs=copy.copy(obs)
+            theory_obs.append(i)
+            post=self.sampling_param_tied(num_tar,theory_obs,150,10)
+            # reward if it gets it right, punish if wrong
+            if max(post)>threshold:
+                if i%2==1:
+                    R[:,i]=-num_tar
+                    R[np.argmax(post),i]=10*num_tar
+                # prefer affirmative classification
+                else:
+                    R[:,i]=-.5*num_tar
+                    R[np.argmax(post),i]=20*num_tar
+        #  print R
+
+        # expected reward if the human gave any observation
+        E_no_obs=0
+        for n in range(num_tar):
+            E_no_obs+=np.sum(np.multiply(R[n,:],obs_probs_no_state))
+        # sum over the possible answers for each target, ask regardless of answer
+        R_act=np.zeros((num_tar,num_tar))
+        for n in range(num_tar):
+            R_act[:,n]=np.sum([R[:,2*n],R[:,2*n+1]])
+        # expected reward if we make the human talk about a single target
+        for n in range(num_tar):
+            E_with_obs=(obs_probs_no_state[2*n]+obs_probs_no_state[2*n+1])*np.sum(R_act,axis=0)[n]
+            VOI[n]=E_with_obs-E_no_obs
+        print VOI
+        if max(VOI)>0:
+            return np.argmax(VOI)
+        else:
+            return None
+             
+if __name__ == '__main__':
+    a=Human()
+    a.DirPrior(5)
+    a.HumanAnswer(5,2,4,[0,4])

@@ -148,9 +148,6 @@ if __name__ == '__main__':
         tied_times=[]
         tied_number=[]
         tied_match_times=[]
-        ind_times=[]
-        ind_number=[]
-        ind_match_times=[]
     else:
         full_times=None
         full_number=None
@@ -158,9 +155,16 @@ if __name__ == '__main__':
         tied_times=None
         tied_number=None
         tied_match_times=None
+    if cfg['sim_types']['ind_dir']:
+        ind_times=[]
+        ind_number=[]
+        ind_match_times=[]
+    else:
         ind_times=None
         ind_number=None
         ind_match_times=None
+
+
     #  # human validation
     #  all_theta2_tied=np.empty((num_events,4,4))
     #  all_theta2_full=np.empty((num_events,2*num_tar*num_tar,2*num_tar))
@@ -195,6 +199,7 @@ if __name__ == '__main__':
 
         # getting a prior from ML
         if cfg['starting_dist']=='assist':
+            ml_threshold=0.6
             if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir'] and cfg['sim_types']['ind_dir']:
                 param_tied_sim.make_data(genus)
                 param_tied_sim.frame=0
@@ -203,7 +208,7 @@ if __name__ == '__main__':
                 for i in param_tied_sim.names:
                     param_tied_sim.alphas[i]=[-1,-1]
                     param_tied_sim.probs[i]=.2
-                while max(param_tied_sim.probs.values())<0.6:
+                while max(param_tied_sim.probs.values())<ml_threshold:
                     param_tied_sim.updateProbsML()
                     param_tied_sim.frame+=1
                 full_sim.probs=param_tied_sim.probs
@@ -233,7 +238,7 @@ if __name__ == '__main__':
                 for i in param_tied_sim.names:
                     param_tied_sim.alphas[i]=[-1,-1]
                     param_tied_sim.probs[i]=.2
-                while max(param_tied_sim.probs.values())<0.6:
+                while max(param_tied_sim.probs.values())<ml_threshold:
                     param_tied_sim.updateProbsML()
                     param_tied_sim.frame+=1
                 full_sim.probs=param_tied_sim.probs
@@ -257,7 +262,7 @@ if __name__ == '__main__':
                 for i in param_tied_sim.names:
                     param_tied_sim.alphas[i]=[-1,-1]
                     param_tied_sim.probs[i]=.2
-                while max(param_tied_sim.probs.values())<0.6:
+                while max(param_tied_sim.probs.values())<ml_threshold:
                     param_tied_sim.updateProbsML()
                     param_tied_sim.frame+=1
                 ind_sim.probs=param_tied_sim.probs
@@ -281,7 +286,7 @@ if __name__ == '__main__':
                 for i in full_sim.names:
                     full_sim.alphas[i]=[-1,-1]
                     full_sim.probs[i]=.2
-                while max(full_sim.probs.values())<0.6:
+                while max(full_sim.probs.values())<ml_threshold:
                     full_sim.updateProbsML()
                     full_sim.frame+=1
                 chosen=np.argmax(full_sim.probs.values())
@@ -299,7 +304,7 @@ if __name__ == '__main__':
                 for i in param_tied_sim.names:
                     param_tied_sim.alphas[i]=[-1,-1]
                     param_tied_sim.probs[i]=.2
-                while max(param_tied_sim.probs.values())<0.6:
+                while max(param_tied_sim.probs.values())<ml_threshold:
                     param_tied_sim.updateProbsML()
                     param_tied_sim.frame+=1
                 chosen=np.argmax(param_tied_sim.probs.values())
@@ -310,14 +315,19 @@ if __name__ == '__main__':
                     pred_tar_tied_ml.append(np.argmax(param_tied_sim.probs.values()))
 
         elif cfg['starting_dist']=='uniform':
-            if (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
+            choose_from=[1]
+            for i in range(num_tar-1):
+                choose_from.append(0)
+            # TODO: include independent observations
+            if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir'] and cfg['sim_types']['ind_dir']:
                 full_sim.probs={}
                 param_tied_sim.probs={}
+                ind_sim.probs={}
                 for i in param_tied_sim.names:
-                    full_sim.probs[i]=.2
-                    param_tied_sim.probs[i]=.2
-                #TODO: this needs to change for different target number
-                chosen=np.random.choice([0,0,0,0,1])
+                    full_sim.probs[i]=1/num_tar
+                    ind_sim.probs[i]=1/num_tar
+                    param_tied_sim.probs[i]=1/num_tar
+                chosen=np.random.choice(choose_from)
                 if graph_params['sim_results_full']:
                     correct_ml_full[n]=chosen
                     correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
@@ -326,20 +336,54 @@ if __name__ == '__main__':
                     correct_ml_tied[n]=chosen
                     correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
                     pred_tar_tied_ml.append(np.random.randint(num_tar))
+                if graph_params['sim_results_ind']:
+                    correct_ml_ind[n]=chosen
+                    correct_percent_ml_ind.append(sum(correct_ml_ind)/(n+1))
+                    pred_tar_ind_ml.append(np.random.randint(num_tar))
+            elif (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
+                full_sim.probs={}
+                param_tied_sim.probs={}
+                for i in param_tied_sim.names:
+                    full_sim.probs[i]=1/num_tar
+                    param_tied_sim.probs[i]=1/num_tar
+                chosen=np.random.choice(choose_from)
+                if graph_params['sim_results_full']:
+                    correct_ml_full[n]=chosen
+                    correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
+                    pred_tar_full_ml.append(np.random.randint(num_tar))
+                if graph_params['sim_results_tied']:
+                    correct_ml_tied[n]=chosen
+                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+                    pred_tar_tied_ml.append(np.random.randint(num_tar))
+            elif (cfg['sim_types']['ind_dir']) and (cfg['sim_types']['param_tied_dir']):
+                ind_sim_probs.probs={}
+                param_tied_sim.probs={}
+                for i in param_tied_sim.names:
+                    ind_sim.probs[i]=1/num_tar
+                    param_tied_sim.probs[i]=1/num_tar
+                chosen=np.random.choice(choose_from)
+                if graph_params['sim_results_ind']:
+                    correct_ml_ind[n]=chosen
+                    correct_percent_ml_ind.append(sum(correct_ml_ind)/(n+1))
+                    pred_tar_ind.append(np.random.randint(num_tar))
+                if graph_params['sim_results_tied']:
+                    correct_ml_tied[n]=chosen
+                    correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+                    pred_tar_tied_ml.append(np.random.randint(num_tar))
             elif (cfg['sim_types']['full_dir']) and not (cfg['sim_types']['param_tied_dir']):
                 full_sim.probs={}
                 for i in full_sim.names:
-                    full_sim.probs[i]=.2
+                    full_sim.probs[i]=1/num_tar
                 if graph_params['sim_results_full']:
-                    correct_ml_full[n]=np.random.choice([0,0,0,0,1])
+                    correct_ml_full[n]=np.random.choice(choose_from)
                     correct_percent_ml_full.append(sum(correct_ml_full)/(n+1))
                     pred_tar_full_ml.append(np.random.randint(num_tar))
             elif not (cfg['sim_types']['full_dir']) and (cfg['sim_types']['param_tied_dir']):
                 param_tied_sim.probs={}
                 for i in param_tied_sim.names:
-                    param_tied_sim.probs[i]=.2
+                    param_tied_sim.probs[i]=1/num_tar
                 if graph_params['sim_results_tied']:
-                    correct_ml_tied[n]=np.random.choice([0,0,0,0,1])
+                    correct_ml_tied[n]=np.random.choice(choose_from)
                     correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
                     pred_tar_tied_ml.append(np.random.randint(num_tar))
 
@@ -384,9 +428,10 @@ if __name__ == '__main__':
                 param_tied_sim.moment_matching()
                 param_tied_sim.moment_matching_small()
                 tied_match_times.append(time.time()-start)
-            start=time.time()
-            ind_sim.moment_matching_ind(num_tar)
-            ind_match_times.append(time.time()-start)
+            if count_ind>0:
+                start=time.time()
+                ind_sim.moment_matching_ind(num_tar)
+                ind_match_times.append(time.time()-start)
 
         elif cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir']:
             full_sim_probs=full_sim.probs.values()
@@ -396,6 +441,10 @@ if __name__ == '__main__':
             while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold):
                 if time.time()-start_tar>20:
                     break
+                #TODO: add VOI here
+                if count_tied>0:
+                    param_tied_sim.VOI(num_tar,obs,threshold)
+                    sys.exit()
                 obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
                 if max(full_sim_probs)<threshold:
                     start=time.time()
@@ -441,9 +490,10 @@ if __name__ == '__main__':
                     count_tied+=1
             ind_number.append(count_ind)
             tied_number.append(count_tied)
-            start=time.time()
-            ind_sim.moment_matching_ind(num_tar)
-            ind_match_times.append(time.time()-start)
+            if count_ind>0:
+                start=time.time()
+                ind_sim.moment_matching_ind(num_tar)
+                ind_match_times.append(time.time()-start)
             if count_tied>1:
                 start=time.time()
                 param_tied_sim.moment_matching()
