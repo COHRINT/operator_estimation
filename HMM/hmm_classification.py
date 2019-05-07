@@ -107,6 +107,8 @@ class HMM_Classification():
             #  genus=0
             species = Cumuliform(genus = genus,weather=False)
             data = species.intensityModel
+            var=0.5
+            data=data+np.random.normal(0,var,(len(data)))
 
 
             alphas = {}
