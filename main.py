@@ -199,7 +199,7 @@ if __name__ == '__main__':
 
         # getting a prior from ML
         if cfg['starting_dist']=='assist':
-            ml_threshold=0.3
+            ml_threshold=0.6
             if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir'] and cfg['sim_types']['ind_dir']:
                 param_tied_sim.make_data(genus)
                 param_tied_sim.frame=0
