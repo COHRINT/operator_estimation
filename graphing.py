@@ -587,12 +587,24 @@ class Graphing():
             full_match=np.mean(full_match_times)
             full_match_std=np.std(full_match_times)
             full_avg_num=np.mean(full_number)
+        else:
+            full_mean=None
+            full_std=None
+            full_match=None
+            full_match_std=None
+            full_avg_num=None
         if ind_times is not None:
             ind_mean=np.mean(ind_times)
             ind_std=np.std(ind_times)
             ind_match=np.mean(ind_match_times)
             ind_match_std=np.std(ind_match_times)
             ind_avg_num=np.mean(ind_number)
+        else:
+            ind_mean=None
+            ind_std=None
+            ind_match=None
+            ind_match_std=None
+            ind_avg_num=None
         tied_mean=np.mean(tied_times)
         tied_std=np.std(tied_times)
         tied_match=np.mean(tied_match_times)
