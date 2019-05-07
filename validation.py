@@ -186,7 +186,7 @@ class DataFusion(Human):
 
     def make_data(self,genus,graph=False):
         model=Cumuliform(genus=genus,weather=False)
-        intensity_data=model.intensityModel+np.random.normal(0,2,(len(model.intensityModel)))
+        intensity_data=model.intensityModel+np.random.normal(0,0.1,(len(model.intensityModel)))
         for j in range(len(intensity_data)):
             intensity_data[j]=max(intensity_data[j],1e-5)
         self.intensity_data=intensity_data
@@ -635,7 +635,7 @@ class DataFusion(Human):
         for n in range(num_tar):
             E_with_obs=(obs_probs_no_state[2*n]+obs_probs_no_state[2*n+1])*np.sum(R_act,axis=0)[n]
             VOI[n]=E_with_obs-E_no_obs
-        print VOI
+        #  print VOI
         if max(VOI)>0:
             return np.argmax(VOI)
         else:

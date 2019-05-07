@@ -199,7 +199,7 @@ if __name__ == '__main__':
 
         # getting a prior from ML
         if cfg['starting_dist']=='assist':
-            ml_threshold=0.6
+            ml_threshold=0.3
             if cfg['sim_types']['param_tied_dir'] and cfg['sim_types']['full_dir'] and cfg['sim_types']['ind_dir']:
                 param_tied_sim.make_data(genus)
                 param_tied_sim.frame=0
@@ -399,7 +399,13 @@ if __name__ == '__main__':
             while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold) or (max(ind_sim_probs)<threshold):
                 if time.time()-start_tar>20:
                     break
-                obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
+                tar_to_ask=None
+                #  if count_tied>0:
+                #      tar_to_ask=param_tied_sim.VOI(num_tar,obs,threshold)
+                if tar_to_ask is not None:
+                    obs=param_tied_sim.HumanAnswer(num_tar,tar_to_ask,genus,obs)
+                else:
+                    obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
                 if max(full_sim_probs)<threshold:
                     start=time.time()
                     full_sim_probs=full_sim.sampling_full(num_tar,obs)
@@ -441,10 +447,13 @@ if __name__ == '__main__':
             while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold):
                 if time.time()-start_tar>20:
                     break
-                #TODO: add VOI here
-                if count_tied>0:
-                    param_tied_sim.VOI(num_tar,obs,threshold)
-                    sys.exit()
+                tar_to_ask=None
+                #  if count_tied>0:
+                #      tar_to_ask=param_tied_sim.VOI(num_tar,obs,threshold)
+                    #  sys.exit()
+                #  if tar_to_ask is not None:
+                #      obs=param_tied_sim.HumanAnswer(num_tar,tar_to_ask,genus,obs)
+                #  else:
                 obs=param_tied_sim.HumanObservations(num_tar,genus,obs)
                 if max(full_sim_probs)<threshold:
                     start=time.time()
@@ -599,6 +608,9 @@ if __name__ == '__main__':
         pred_tar_ml=None
 
 
+    print "Ind percent,num:",correct_percent_ind[-1],np.mean(ind_number)
+    print "Tied percent,num:",correct_percent_tied[-1],np.mean(tied_number)
+    print "Full percent,num:",correct_percent_full[-1],np.mean(full_number)
     graphs=Graphing(num_events,num_tar,alphas_start,theta2,true_tar_full,
             pred_tar_full,real_obs,pred_obs,pred_tar_ml,correct_percent_full,
             correct_percent_ml_full,correct_full,pred_percent_full,true_tar_tied,

@@ -1,5 +1,5 @@
 starting_dist: 'assist' #uniform or assist
-num_tar: 5
+num_tar: 10
 # threshold: 0.682
 threshold: 0.9
 human: 'good'
@@ -7,13 +7,13 @@ sim_types:
     param_tied_dir: True
     full_dir: True
     # can't run ind without param tied
-    ind_dir: False
+    ind_dir: True
 graphs:
     theta_val: True
     gibbs_val: False
     sim_results_full: True
     sim_results_tied: True
-    sim_results_ind: False
+    sim_results_ind: True
     human_val: False
     convergence: False
     timing: True
