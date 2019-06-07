@@ -9,6 +9,7 @@ import os
 import time
 import copy
 from tqdm import tqdm
+from scipy.misc import logsumexp
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'data_sim')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..')))
@@ -73,21 +74,98 @@ class HMM_Classification():
         return allSeries
 
 
+    def eln(self,x):
+        if x==0:
+            return np.NaN
+        elif x>0:
+            return np.log(x)
+        else:
+            raise(NotImplementedError)
+
+    def elnsum(self,elnx,elny):
+        if np.isnan(elnx) or np.isnan(elny):
+            if np.isnan(elnx):
+                return elny
+            else:
+                return elnx
+        else:
+            return elnx+elny
+            #  if elnx>elny:
+            #      return elnx + self.eln(1+np.exp(elny-elnx))
+            #  else:
+            #      return elny + self.eln(1+np.exp(elnx-elny))
+
+    def elnproduct(self,elnx,elny):
+        if np.isnan(elnx) or np.isnan(elny):
+            return np.NaN
+        else:
+            return elnx + elny
+
+    #  def continueForward(self, newData, model, prevAlpha=[-1,-1]):
+    #      x0 = model['prior']
+    #      pxx = model['transition']
+    #      pyx = model['obs']
+
+    #      numStates = len(x0)
+    #      if prevAlpha[0] == -1:
+    #          prevAlpha=x0
+
+    #      newAlpha = [0]*numStates
+    #      for xcur in range(numStates):
+    #          for xprev in range(numStates):
+    #              newAlpha[xcur] += prevAlpha[xprev]*pxx[xcur][xprev]
+    #          newAlpha[xcur] = newAlpha[xcur]*pyx[xcur].pointEval(newData)
+        #  return newAlpha
+
     def continueForward(self, newData, model, prevAlpha=[-1,-1]):
         x0 = model['prior']
         pxx = model['transition']
         pyx = model['obs']
 
         numStates = len(x0)
+        #  print len(prevAlpha)
         if prevAlpha[0] == -1:
-            prevAlpha=x0
+            prevAlpha=[0]*numStates
+            for j in range(numStates):
+                prevAlpha[j]=self.eln(x0[j])
+        #  print len(prevAlpha)
 
         newAlpha = [0]*numStates
         for xcur in range(numStates):
             for xprev in range(numStates):
-                newAlpha[xcur] += prevAlpha[xprev]*pxx[xcur][xprev]
-            newAlpha[xcur] = newAlpha[xcur]*pyx[xcur].pointEval(newData)
+                newAlpha[xcur] = self.elnsum(newAlpha[xcur],np.exp(self.elnproduct(prevAlpha[xprev],self.eln(pxx[xcur][xprev]))))
+                #  newAlpha[xcur] += np.exp(prevAlpha[xprev]+np.log(pxx[xcur][xprev]))
+            #  newAlpha[xcur] = np.log(newAlpha[xcur])+np.log(pyx[xcur].pointEval(newData))
+            newAlpha[xcur] = self.elnproduct(self.eln(newAlpha[xcur]),self.eln(pyx[xcur].pointEval(newData)))
         return newAlpha
+
+    def expNormalize(self,alpha_logs):
+        numStates=alpha_logs.shape[1]
+        numTypes=alpha_logs.shape[0]
+
+        alpha_logs=alpha_logs.reshape((1,numStates*numTypes))
+        prob_norm=np.zeros((alpha_logs.shape[0],alpha_logs.shape[1]))
+        shift=np.nanmax(alpha_logs)
+        #  print shift
+        normalizer=0
+        for j in range(numStates*numTypes):
+            if np.isnan(alpha_logs[0,j]):
+                pass
+            else:
+                normalizer+=np.exp(alpha_logs[0,j]-shift)
+        #  print normalizer
+
+        for j in range(numStates*numTypes):
+            if np.isnan(alpha_logs[0,j]):
+                pass
+            else:
+                prob_norm[0,j]=np.exp(alpha_logs[0,j]-shift)/normalizer
+
+        prob_norm=prob_norm.reshape((numTypes,numStates))
+        prob_norm=np.sum(prob_norm,axis=1)
+
+        #  print prob_norm,sum(prob_norm)
+        return prob_norm
 
     def testHMM(self,num_events,num_tar=5):
         if num_tar==10:
@@ -102,12 +180,16 @@ class HMM_Classification():
         #  genNames = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
         correct=0
         #  for i in range(num_tar):
+        log_like_total=np.zeros((1,2))
+        right=np.zeros((1,100))
+        wrong=np.zeros((1,100))
         for i in tqdm(range(num_events),ncols=100):
-            genus=np.random.randint(5)
+            genus=np.random.randint(num_tar)
             #  genus=0
             species = Cumuliform(genus = genus,weather=False)
             data = species.intensityModel
             var=0.5
+            #  var=2
             data=data+np.random.normal(0,var,(len(data)))
 
 
@@ -116,28 +198,63 @@ class HMM_Classification():
                 alphas[i] = [-1,-1]
 
             probs = {}
+            probs2 = {}
             for i in genNames:
                 probs[i] = .2
+                probs2[i] = .2
             
             count=0
-            while max(probs.values())<0.4:
+            #  log_like=np.zeros((1,2))
+            log_like=[]
+            #  print
+            #  while max(probs.values())<0.9:
+            big_alphas=np.zeros((num_tar,4))
+            for j in range(len(data)):
                     #update classification probs
+                    big_count=0
                     for i in genNames:
                         alphas[i] = self.continueForward(data[count], models[i], alphas[i])
-                        #  print alphas[i]
-                        probs[i] = probs[i]*sum(alphas[i])
+                        big_alphas[big_count,:]=alphas[i]
+                        big_count+=1
 
                     #normalize probs
-                    suma = sum(probs.values())
+                    #  print big_alphas
+                    prob_norm=self.expNormalize(big_alphas)
+                    #  print prob_norm
+                    #  raw_input()
+                    #  sys.exit()
+                    big_count=0
                     for i in genNames:
-                        probs[i] = probs[i]/suma
+                        probs[i]=prob_norm[big_count]
+                        big_count+=1
                     count+=1
-            #  print np.max(probs.values())
+                    #  print probs
+
+                    alpha_total=0
+                    for i in genNames:
+                        alpha_total+=sum(alphas[i])/count
+                    alpha_norm=alpha_total
+                    #  print log_like
+                    log_like.append(alpha_norm)
             chosen=np.argmax(probs.values())
             #  print genus,chosen
             if genus==chosen:
                 correct+=1
-        print (correct/num_tar)
+                right=np.append(right,np.array([log_like]),axis=0)
+            else:
+                wrong=np.append(wrong,np.array([log_like]),axis=0)
+
+        print (correct/num_events)
+        right_mean=np.mean(right,axis=0)
+        right_std=np.std(right,axis=0)
+        wrong_mean=np.mean(wrong,axis=0)
+        wrong_std=np.std(wrong,axis=0)
+        plt.plot(range(len(right_mean)),right_mean,label='correct')
+        plt.fill_between(range(len(right_mean)),right_mean+right_std,right_mean-right_std,alpha=0.5)
+        plt.plot(range(len(wrong_mean)),wrong_mean,label='wrong')
+        plt.fill_between(range(len(wrong_mean)),wrong_mean+wrong_std,wrong_mean-wrong_std,alpha=0.5)
+        plt.legend()
+        plt.show()
 
 if __name__ == '__main__':
     hc=HMM_Classification()
@@ -150,4 +267,4 @@ if __name__ == '__main__':
         hc.buildModels(dataSet,10)
 
     if 'test' in commands:
-        hc.testHMM(500,10)
+        hc.testHMM(100,10)
