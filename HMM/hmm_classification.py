@@ -92,9 +92,7 @@ class HMM_Classification():
             return np.log(x)
         else:
             #  raise(NotImplementedError)
-            #  return np.NaN
             return 0.0
-
 
     def elnproduct(self,elnx,elny):
         if np.isnan(elnx) or np.isnan(elny):
@@ -180,13 +178,13 @@ class HMM_Classification():
         log_like_total=np.zeros((1,2))
         right=np.zeros((1,100))
         wrong=np.zeros((1,100))
-        for i in tqdm(range(num_events),ncols=100):
+        for k in tqdm(range(num_events),ncols=100):
             genus=np.random.randint(num_tar)
             #  genus=0
             species = Cumuliform(genus = genus,weather=False)
             data = species.intensityModel
-            var=0.5
-            #  var=2
+            #  var=0.5
+            var=2
             data=data+np.random.normal(0,var,(len(data)))
 
 
@@ -195,17 +193,16 @@ class HMM_Classification():
                 alphas[i] = [-1,-1]
 
             probs = {}
-            probs2 = {}
             for i in genNames:
                 probs[i] = .2
-                probs2[i] = .2
             
             count=0
             log_like=[]
             #  print
-            #  while max(probs.values())<0.9:
             big_alphas=np.zeros((num_tar,4))
+            #  while (max(probs.values())<0.9):
             for j in range(len(data)):
+                if count<100:
                     #update classification probs
                     big_count=0
                     for i in genNames:
@@ -227,6 +224,8 @@ class HMM_Classification():
                     alpha_norm=alpha_total
                     #  print log_like
                     log_like.append(alpha_norm)
+                else:
+                    break
             chosen=np.argmax(probs.values())
             #  print alphas
             #  print genus,chosen
@@ -259,4 +258,4 @@ if __name__ == '__main__':
         hc.buildModels(dataSet,10)
 
     if 'test' in commands:
-        hc.testHMM(300,10)
+        hc.testHMM(300,5)
