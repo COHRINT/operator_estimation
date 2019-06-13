@@ -73,15 +73,6 @@ class HMM_Classification():
                 allSeries[i].append(c)
         return allSeries
 
-
-    def eln(self,x):
-        if x==0:
-            return np.NaN
-        elif x>0:
-            return np.log(x)
-        else:
-            raise(NotImplementedError)
-
     def elnsum(self,elnx,elny):
         if np.isnan(elnx) or np.isnan(elny):
             if np.isnan(elnx):
@@ -89,11 +80,21 @@ class HMM_Classification():
             else:
                 return elnx
         else:
-            return elnx+elny
-            #  if elnx>elny:
-            #      return elnx + self.eln(1+np.exp(elny-elnx))
-            #  else:
-            #      return elny + self.eln(1+np.exp(elnx-elny))
+            if elnx>elny:
+                return elnx + self.eln(1+np.exp(elny-elnx))
+            else:
+                return elny + self.eln(1+np.exp(elnx-elny))
+
+    def eln(self,x):
+        if x==0:
+            return np.NaN
+        elif x>0:
+            return np.log(x)
+        else:
+            #  raise(NotImplementedError)
+            #  return np.NaN
+            return 0.0
+
 
     def elnproduct(self,elnx,elny):
         if np.isnan(elnx) or np.isnan(elny):
@@ -123,7 +124,7 @@ class HMM_Classification():
         pyx = model['obs']
 
         numStates = len(x0)
-        #  print len(prevAlpha)
+        #  print x0
         if prevAlpha[0] == -1:
             prevAlpha=[0]*numStates
             for j in range(numStates):
@@ -133,9 +134,7 @@ class HMM_Classification():
         newAlpha = [0]*numStates
         for xcur in range(numStates):
             for xprev in range(numStates):
-                newAlpha[xcur] = self.elnsum(newAlpha[xcur],np.exp(self.elnproduct(prevAlpha[xprev],self.eln(pxx[xcur][xprev]))))
-                #  newAlpha[xcur] += np.exp(prevAlpha[xprev]+np.log(pxx[xcur][xprev]))
-            #  newAlpha[xcur] = np.log(newAlpha[xcur])+np.log(pyx[xcur].pointEval(newData))
+                newAlpha[xcur] = self.elnproduct(newAlpha[xcur],np.exp(self.elnproduct(prevAlpha[xprev],self.eln(pxx[xcur][xprev]))))
             newAlpha[xcur] = self.elnproduct(self.eln(newAlpha[xcur]),self.eln(pyx[xcur].pointEval(newData)))
         return newAlpha
 
@@ -177,9 +176,7 @@ class HMM_Classification():
         genNames=[]
         for i in range(num_tar):
             genNames.append('Cumuliform'+str(i))
-        #  genNames = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
         correct=0
-        #  for i in range(num_tar):
         log_like_total=np.zeros((1,2))
         right=np.zeros((1,100))
         wrong=np.zeros((1,100))
@@ -204,7 +201,6 @@ class HMM_Classification():
                 probs2[i] = .2
             
             count=0
-            #  log_like=np.zeros((1,2))
             log_like=[]
             #  print
             #  while max(probs.values())<0.9:
@@ -218,25 +214,21 @@ class HMM_Classification():
                         big_count+=1
 
                     #normalize probs
-                    #  print big_alphas
                     prob_norm=self.expNormalize(big_alphas)
-                    #  print prob_norm
-                    #  raw_input()
-                    #  sys.exit()
                     big_count=0
                     for i in genNames:
                         probs[i]=prob_norm[big_count]
                         big_count+=1
                     count+=1
-                    #  print probs
 
                     alpha_total=0
                     for i in genNames:
-                        alpha_total+=sum(alphas[i])/count
+                        alpha_total+=np.nansum(alphas[i])/count
                     alpha_norm=alpha_total
                     #  print log_like
                     log_like.append(alpha_norm)
             chosen=np.argmax(probs.values())
+            #  print alphas
             #  print genus,chosen
             if genus==chosen:
                 correct+=1
@@ -267,4 +259,4 @@ if __name__ == '__main__':
         hc.buildModels(dataSet,10)
 
     if 'test' in commands:
-        hc.testHMM(100,10)
+        hc.testHMM(300,10)
