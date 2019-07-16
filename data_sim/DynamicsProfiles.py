@@ -390,36 +390,52 @@ class Cumuliform(FamilyContainer):
                         stageSets = [0,5,45,60,100];
                         vals = [5,4.5,0.5,3];
                 elif(self.genus==5):
-                        stageSets = [0,15,55,70,100];
-                        vals = [3.5,4,5.5,11];
+                        stageSets = [0,5,35,70,100];
+                        vals = [3,7,5.5,11];
                 elif(self.genus == 6):
-                        stageSets = [0,10,45,75,100];
-                        vals = [8,3,4.5,7];
+                        stageSets = [0,10,60,80,100];
+                        vals = [8,1,9,7];
                 elif(self.genus == 7):
-                        stageSets = [0,5,40,75,100];
-                        vals = [5,7,1.5,4.5];
+                        stageSets = [0,5,50,90,100];
+                        vals = [3.5,7,1.5,4.5];
                 elif(self.genus == 8):
-                        stageSets = [0,20,50,65,100];
-                        vals = [4.5,10,2,7.5];
+                        stageSets = [0,8,32,45,100];
+                        vals = [5,10,2,7.5];
                 elif(self.genus == 9):
-                        stageSets = [0,5,40,70,100];
-                        vals = [6,3.5,0.5,5.5];
+                        stageSets = [0,5,70,80,100];
+                        vals = [6,9,0.5,5.5];
 
                 #  if(self.genus==0):
-                #          stageSets = [0,5,50,60,100];
-                #          vals = [7,4,2,5];
+                #          stageSets = [0,15,50,70,100];
+                #          vals = [40,60,10,80];
                 #  elif(self.genus == 1):
-                #          stageSets = [0,10,50,60,100];
-                #          vals = [7.5,4,2,5];
+                #          stageSets = [0,10,50,65,100];
+                #          vals = [85,50,25,50];
                 #  elif(self.genus == 2):
-                #          stageSets = [0,5,55,60,100];
-                #          vals = [7,4,2.5,5];
+                #          stageSets = [0,5,50,60,100];
+                #          vals = [60,30,45,60];
                 #  elif(self.genus == 3):
-                #          stageSets = [0,5,50,70,100];
-                #          vals = [7,4,2,5.5];
+                #          stageSets = [0,20,40,75,100];
+                #          vals = [70,90,30,55];
                 #  elif(self.genus == 4):
                 #          stageSets = [0,5,45,60,100];
-                #          vals = [7,4.5,2,5];
+                #          vals = [50,45,5,30];
+                #  elif(self.genus==5):
+                #          stageSets = [0,5,35,70,100];
+                #          vals = [30,70,55,110];
+                #  elif(self.genus == 6):
+                #          stageSets = [0,10,60,80,100];
+                #          vals = [80,10,90,70];
+                #  elif(self.genus == 7):
+                #          stageSets = [0,5,50,90,100];
+                #          vals = [35,70,15,45];
+                #  elif(self.genus == 8):
+                #          stageSets = [0,8,32,45,100];
+                #          vals = [50,100,20,75];
+                #  elif(self.genus == 9):
+                #          stageSets = [0,5,70,80,100];
+                #          vals = [60,90,5,55];
+
 
 		for i in range(1,len(stageSets)):
 			for j in range(stageSets[i-1],stageSets[i]):
