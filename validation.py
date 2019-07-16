@@ -166,6 +166,14 @@ class Human():
         obs.append(np.random.choice([2*tar_asked,2*tar_asked+1],p=prob/sum(prob)))
         return obs
 
+    def HumanAnswer2(self,num_tar,real_target,obs):
+        if len(obs)==0:
+            prob=self.theta1_correct[real_target,:]
+        prev_obs=obs[-1]
+        prob=self.theta2_correct[real_target*2*num_tar+prev_obs,:]
+        return np.random.choice(range(2*num_tar),p=prob)
+        #  return obs
+
 
 class DataFusion(Human):
     def __init__(self,num_tar):
@@ -182,6 +190,8 @@ class DataFusion(Human):
             self.names.append('Cumuliform'+str(i))
         #  self.names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
         self.alphas={}
+        for i in self.names:
+            alphas[i] = [-1,-1]
         self.sampling_data=True
 
     def make_data(self,genus,graph=False):
@@ -640,8 +650,107 @@ class DataFusion(Human):
             return np.argmax(VOI)
         else:
             return None
+
+    def VOI2(self,num_tar,threshold,post):
+        num_samples=100
+        if num_tar==10:
+            confidence=np.load('hmm_con_10.npy')
+        else:
+            confidence=np.load('hmm_con.npy')
+        R=np.zeros((num_tar,num_tar))
+        VOI=np.zeros(num_tar)
+        # create our p(o'|o,X,theta_2)
+        #TODO: We are using the full theta2, this can be done with the param tied version
+        for X in range(num_tar):
+            theta1[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_full[X,:])
+            for prev_obs in range(2*num_tar):
+                theta2[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
+        #  for i in self.names:
+        #      # likelihood from theta1
+        #      likelihood=theta1[self.names.index(i),obs[0]]
+        #      # likelihood from theta2
+        #      for value in obs[1:]:
+        #          likelihood*=theta2[self.names.index(i)*2*num_tar+obs[obs.index(value)-1],value]
+        #      post[i]=self.probs[i]*likelihood
+        # normalize
+        #  suma=sum(post.values())
+        #  for i in self.names:
+        #      post[i]=np.log(post[i])-np.log(suma)
+        #      post[i]=np.exp(post[i])
+
+        for X in range(num_tar):
+            for n in range(num_samples):
+                obs=[]
+                post_sample=copy.deepcopy(post)
+                #  X=np.random.choice(range(num_tar),p=post.values())
+                while max(post.values())<threshold:
+                    if len(obs)==0:
+                        obs.append(self.HumanObservations(num_tar,X,obs))
+                    else:
+                        obs.append(self.HumanAnswer2(num_tar,X,obs))
+                    for i in self.names:
+                        #  likelihood*=theta2[self.names.index(i)*2*num_tar+obs[-2],obs[-1]]
+                        if len(obs)==1:
+                            post_sample[i]*=theta1[self.index.names(i),obs[0]]
+                        else:
+                            post_sample[i]*=theta2[self.names.index(i)*2*num_tar+obs[-2],obs[-1]]
+                    # normalize
+                    suma=sum(post_sample.values())
+                    for i in self.names:
+                        post_sample[i]=np.log(post_sample[i])-np.log(suma) 
+                        post_sample[i]=np.exp(post_sample[i])
+                if np.argmax(post_sample.values())==X:
+                    R[X,X]+=1
+                else:
+                    R[X,np.argmax(post_sample.values())]-=1
+        print R
+        sys.exit()
+
+                #TODO: take sample obs, store it, calculate
+
+        # we must marginalize out the target types
+        #  sum_tar=np.zeros(2*num_tar)
+        #  for X in range(num_tar):
+        #      # don't forget to mul by our probs
+        #      sum_tar=np.sum([sum_tar,post[X]*obs_probs[obs[-1]+X*2*num_tar,:]],axis=0)
+        #  # normalize
+        #  obs_probs_no_state=sum_tar/np.sum(sum_tar)
+
+        # small samples of what would happend if an observation was really given
+        for i in range(num_tar*2):
+            theory_obs=copy.copy(obs)
+            theory_obs.append(i)
+            post=self.sampling_param_tied(num_tar,theory_obs,150,10)
+            # reward if it gets it right, punish if wrong
+            if max(post)>threshold:
+                if i%2==1:
+                    R[:,i]=-num_tar
+                    R[np.argmax(post),i]=10*num_tar
+                # prefer affirmative classification
+                else:
+                    R[:,i]=-.5*num_tar
+                    R[np.argmax(post),i]=20*num_tar
+        #  print R
+
+        # expected reward if the human gave any observation
+        E_no_obs=0
+        for n in range(num_tar):
+            E_no_obs+=np.sum(np.multiply(R[n,:],obs_probs_no_state))
+        # sum over the possible answers for each target, ask regardless of answer
+        R_act=np.zeros((num_tar,num_tar))
+        for n in range(num_tar):
+            R_act[:,n]=np.sum([R[:,2*n],R[:,2*n+1]])
+        # expected reward if we make the human talk about a single target
+        for n in range(num_tar):
+            E_with_obs=(obs_probs_no_state[2*n]+obs_probs_no_state[2*n+1])*np.sum(R_act,axis=0)[n]
+            VOI[n]=E_with_obs-E_no_obs
+        #  print VOI
+        if max(VOI)>0:
+            return np.argmax(VOI)
+        else:
+            return None
              
 if __name__ == '__main__':
     a=Human()
     a.DirPrior(5)
-    a.HumanAnswer(5,2,4,[0,4])
+    print a.HumanAnswer2(5,2,[0,4])
