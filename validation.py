@@ -191,8 +191,13 @@ class DataFusion(Human):
         #  self.names = ['Cumuliform0','Cumuliform1','Cumuliform2','Cumuliform3','Cumuliform4']
         self.alphas={}
         for i in self.names:
-            alphas[i] = [-1,-1]
+            self.alphas[i] = [-1,-1]
         self.sampling_data=True
+        self.norm_const=np.zeros((num_tar,100))
+        if num_tar==10:
+            self.confidence=np.load('HMM/hmm_con_10.npy')
+        else:
+            self.confidence=np.load('HMM/hmm_con.npy')
 
     def make_data(self,genus,graph=False):
         model=Cumuliform(genus=genus,weather=False)
@@ -232,12 +237,16 @@ class DataFusion(Human):
         data=self.intensity_data[self.frame]
         #forward algorithm
         for i in self.names:
-            self.alphas[i]=self.hmm.continueForward(data,self.hmm_models[i],self.alphas[i])
-            self.probs[i]=self.probs[i]*sum(self.alphas[i])
-        #noramlize
-        suma=sum(self.probs.values())
+            #  self.alphas[i]=self.hmm.continueForward(data,self.hmm_models[i],self.alphas[i])
+            self.alphas[i],self.norm_const[self.names.index(i),self.frame] = self.hmm.continueForward(data, self.hmm_models[i], self.alphas[i])
+        #  self.probs[i]=self.probs[i]*sum(self.alphas[i])
+        prob_norm=self.hmm.expNormalize(self.norm_const[:,:self.frame+1])
         for i in self.names:
-            self.probs[i]/=suma
+            self.probs[i]=prob_norm[self.names.index(i)]
+        #noramlize
+        #  suma=sum(self.probs.values())
+        #  for i in self.names:
+        #      self.probs[i]/=suma
 
     def sampling_full(self,num_tar,obs,num_samples=5000,burn_in=1000):
         postX=copy.deepcopy(self.probs)
@@ -653,45 +662,34 @@ class DataFusion(Human):
 
     def VOI2(self,num_tar,threshold,post):
         num_samples=100
-        if num_tar==10:
-            confidence=np.load('hmm_con_10.npy')
-        else:
-            confidence=np.load('hmm_con.npy')
-        R=np.zeros((num_tar,num_tar))
+        #  R=np.zeros((num_tar,num_tar))
+        R=np.zeros(num_tar)
         VOI=np.zeros(num_tar)
         # create our p(o'|o,X,theta_2)
         #TODO: We are using the full theta2, this can be done with the param tied version
+        theta1=np.empty((num_tar,2*num_tar))
+        theta2=np.empty((2*num_tar*num_tar,2*num_tar))
         for X in range(num_tar):
             theta1[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_full[X,:])
             for prev_obs in range(2*num_tar):
                 theta2[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
-        #  for i in self.names:
-        #      # likelihood from theta1
-        #      likelihood=theta1[self.names.index(i),obs[0]]
-        #      # likelihood from theta2
-        #      for value in obs[1:]:
-        #          likelihood*=theta2[self.names.index(i)*2*num_tar+obs[obs.index(value)-1],value]
-        #      post[i]=self.probs[i]*likelihood
-        # normalize
-        #  suma=sum(post.values())
-        #  for i in self.names:
-        #      post[i]=np.log(post[i])-np.log(suma)
-        #      post[i]=np.exp(post[i])
 
+        right=1
+        wrong=-5
         for X in range(num_tar):
             for n in range(num_samples):
                 obs=[]
                 post_sample=copy.deepcopy(post)
                 #  X=np.random.choice(range(num_tar),p=post.values())
-                while max(post.values())<threshold:
+                while max(post_sample.values())<threshold:
+                    #  print post_sample.values()
                     if len(obs)==0:
-                        obs.append(self.HumanObservations(num_tar,X,obs))
+                        obs=self.HumanObservations(num_tar,X,obs)
                     else:
                         obs.append(self.HumanAnswer2(num_tar,X,obs))
                     for i in self.names:
-                        #  likelihood*=theta2[self.names.index(i)*2*num_tar+obs[-2],obs[-1]]
                         if len(obs)==1:
-                            post_sample[i]*=theta1[self.index.names(i),obs[0]]
+                            post_sample[i]*=theta1[self.names.index(i),obs[0]]
                         else:
                             post_sample[i]*=theta2[self.names.index(i)*2*num_tar+obs[-2],obs[-1]]
                     # normalize
@@ -700,14 +698,21 @@ class DataFusion(Human):
                         post_sample[i]=np.log(post_sample[i])-np.log(suma) 
                         post_sample[i]=np.exp(post_sample[i])
                 if np.argmax(post_sample.values())==X:
-                    R[X,X]+=1
+                    #  R[X,X]+=1
+                    R[X]+=right
                 else:
-                    R[X,np.argmax(post_sample.values())]-=1
-        print R
+                    #  R[X,np.argmax(post_sample.values())]-=1
+                    R[X]-=wrong
+        #  print sum(R*post.values())/num_samples
+        #  sys.exit()
+        reward_matrix=wrong*np.ones((num_tar,num_tar))
+        reward_matrix+=((-wrong+right)*np.eye(num_tar))
+        print self.confidence*reward_matrix
+        ml_reward=np.sum(self.confidence*reward_matrix,axis=1)
+        print sum(ml_reward*post.values())
+        #TODO: take sample obs, store it, calculate
+
         sys.exit()
-
-                #TODO: take sample obs, store it, calculate
-
         # we must marginalize out the target types
         #  sum_tar=np.zeros(2*num_tar)
         #  for X in range(num_tar):
