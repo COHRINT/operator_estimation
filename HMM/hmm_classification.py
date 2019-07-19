@@ -356,4 +356,4 @@ if __name__ == '__main__':
         hc.buildModels(dataSet,10)
 
     if 'test' in commands:
-        hc.testHMM(100,5)
+        hc.testHMM(100,10)
