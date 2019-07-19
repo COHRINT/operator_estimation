@@ -662,10 +662,6 @@ class DataFusion(Human):
 
     def VOI2(self,num_tar,threshold,post):
         num_samples=100
-        #  R=np.zeros((num_tar,num_tar))
-        R=np.zeros(num_tar)
-        VOI=np.zeros(num_tar)
-        # create our p(o'|o,X,theta_2)
         #TODO: We are using the full theta2, this can be done with the param tied version
         theta1=np.empty((num_tar,2*num_tar))
         theta2=np.empty((2*num_tar*num_tar,2*num_tar))
@@ -675,14 +671,18 @@ class DataFusion(Human):
                 theta2[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
 
         right=1
-        wrong=-5
+        wrong=-1
+        R_human=np.zeros(num_tar)
+        R_bot=np.zeros(num_tar)
+        #  print self.confidence
         for X in range(num_tar):
             for n in range(num_samples):
+                # HMM sample
+                classification=np.random.choice(range(num_tar),p=self.confidence[X])
+                # human sample
                 obs=[]
                 post_sample=copy.deepcopy(post)
-                #  X=np.random.choice(range(num_tar),p=post.values())
                 while max(post_sample.values())<threshold:
-                    #  print post_sample.values()
                     if len(obs)==0:
                         obs=self.HumanObservations(num_tar,X,obs)
                     else:
@@ -698,62 +698,24 @@ class DataFusion(Human):
                         post_sample[i]=np.log(post_sample[i])-np.log(suma) 
                         post_sample[i]=np.exp(post_sample[i])
                 if np.argmax(post_sample.values())==X:
-                    #  R[X,X]+=1
-                    R[X]+=right
+                    R_human[X]+=right
                 else:
-                    #  R[X,np.argmax(post_sample.values())]-=1
-                    R[X]-=wrong
-        #  print sum(R*post.values())/num_samples
-        #  sys.exit()
-        reward_matrix=wrong*np.ones((num_tar,num_tar))
-        reward_matrix+=((-wrong+right)*np.eye(num_tar))
-        print self.confidence*reward_matrix
-        ml_reward=np.sum(self.confidence*reward_matrix,axis=1)
-        print sum(ml_reward*post.values())
-        #TODO: take sample obs, store it, calculate
-
+                    R_human[X]+=wrong
+                if classification==X:
+                    R_bot[X]+=right
+                else:
+                    R_bot[X]+=wrong
+        #  print R_human*post.values()
+        #  print R_bot*post.values()
+        print sum(R_human*post.values())/num_samples,sum(R_bot*post.values())/num_samples
+        VOI=(sum(R_human*post.values())/num_samples)-(sum(R_bot*post.values())/num_samples)
+        print VOI
         sys.exit()
-        # we must marginalize out the target types
-        #  sum_tar=np.zeros(2*num_tar)
-        #  for X in range(num_tar):
-        #      # don't forget to mul by our probs
-        #      sum_tar=np.sum([sum_tar,post[X]*obs_probs[obs[-1]+X*2*num_tar,:]],axis=0)
-        #  # normalize
-        #  obs_probs_no_state=sum_tar/np.sum(sum_tar)
-
-        # small samples of what would happend if an observation was really given
-        for i in range(num_tar*2):
-            theory_obs=copy.copy(obs)
-            theory_obs.append(i)
-            post=self.sampling_param_tied(num_tar,theory_obs,150,10)
-            # reward if it gets it right, punish if wrong
-            if max(post)>threshold:
-                if i%2==1:
-                    R[:,i]=-num_tar
-                    R[np.argmax(post),i]=10*num_tar
-                # prefer affirmative classification
-                else:
-                    R[:,i]=-.5*num_tar
-                    R[np.argmax(post),i]=20*num_tar
-        #  print R
-
-        # expected reward if the human gave any observation
-        E_no_obs=0
-        for n in range(num_tar):
-            E_no_obs+=np.sum(np.multiply(R[n,:],obs_probs_no_state))
-        # sum over the possible answers for each target, ask regardless of answer
-        R_act=np.zeros((num_tar,num_tar))
-        for n in range(num_tar):
-            R_act[:,n]=np.sum([R[:,2*n],R[:,2*n+1]])
-        # expected reward if we make the human talk about a single target
-        for n in range(num_tar):
-            E_with_obs=(obs_probs_no_state[2*n]+obs_probs_no_state[2*n+1])*np.sum(R_act,axis=0)[n]
-            VOI[n]=E_with_obs-E_no_obs
-        #  print VOI
-        if max(VOI)>0:
-            return np.argmax(VOI)
+        if VOI>.5:
+            return 1
         else:
-            return None
+            return 0
+
              
 if __name__ == '__main__':
     a=Human()

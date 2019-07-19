@@ -195,6 +195,7 @@ if __name__ == '__main__':
     for n in tqdm(range(num_events),ncols=100):
         # initialize target type
         genus=np.random.randint(num_tar)
+        #  genus=3
         #  param_tied_sim.make_data(genus)
 
         # getting a prior from ML
@@ -402,6 +403,7 @@ if __name__ == '__main__':
                 tar_to_ask=None
                 #  if count_tied>0:
                 #      tar_to_ask=param_tied_sim.VOI(num_tar,obs,threshold)
+                print genus
                 param_tied_sim.VOI2(num_tar,threshold,param_tied_sim.probs)
                 if tar_to_ask is not None:
                     obs=param_tied_sim.HumanAnswer(num_tar,tar_to_ask,genus,obs)
