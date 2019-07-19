@@ -707,10 +707,10 @@ class DataFusion(Human):
                     R_bot[X]+=wrong
         #  print R_human*post.values()
         #  print R_bot*post.values()
-        print sum(R_human*post.values())/num_samples,sum(R_bot*post.values())/num_samples
+        #  print sum(R_human*post.values())/num_samples,sum(R_bot*post.values())/num_samples
         VOI=(sum(R_human*post.values())/num_samples)-(sum(R_bot*post.values())/num_samples)
-        print VOI
-        sys.exit()
+        #  print VOI
+        #  sys.exit()
         if VOI>.5:
             return 1
         else:
