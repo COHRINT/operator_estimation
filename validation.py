@@ -488,16 +488,16 @@ class DataFusion(Human):
                             ax[0].hist(samples,bins=20,density=True)
                             x=np.linspace(0,1)
                             ax[0].plot(x,scipy.stats.beta.pdf(x,alphak,sum(self.theta2[n,:])-alphak))
-                            ax[0].xlabel(r'$\theta_2$')
-                            ax[0].ylabel(r'$p(\theta_2)$')
-                            ax[0].title("Moment Matching for TP,TP")
+                            ax[0].set_xlabel(r'$\theta_2$')
+                            ax[0].set_ylabel(r'$p(\theta_2)$')
+                            ax[0].set_title("Moment Matching for TP,TP")
                         elif (n==1) and (k==0):
                             ax[1].hist(samples,bins=20,density=True)
                             x=np.linspace(0,1)
                             ax[1].plot(x,scipy.stats.beta.pdf(x,alphak,sum(self.theta2[n,:])-alphak))
-                            ax[1].xlabel(r'$\theta_2$')
-                            ax[1].ylabel(r'$p(\theta_2)$')
-                            ax[1].title("Moment Matching for FP,TP")
+                            ax[1].set_xlabel(r'$\theta_2$')
+                            ax[1].set_ylabel(r'$p(\theta_2)$')
+                            ax[1].set_title("Moment Matching for FP,TP")
         if graph:
             fig.savefig('figures/moment_matching.png',bbox_inches='tight',pad_inches=0)
 

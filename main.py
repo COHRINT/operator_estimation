@@ -55,7 +55,6 @@ if __name__ == '__main__':
     human_type=cfg['human']
 
     # target confusion matrix
-    true_tar_full=[]
     pred_tar_full=[]
     pred_tar_full_ml=[]
     # precision recall
@@ -75,6 +74,8 @@ if __name__ == '__main__':
     # precision recall
     pred_percent_tied=[]
     correct_tied=[0]*num_events
+    pred_percent_ml=[]
+    correct_ml=[0]*num_events
     # running average
     correct_percent_tied=[]
     correct_ml_tied=[0]*num_events
@@ -83,7 +84,6 @@ if __name__ == '__main__':
     correct_percent_ml_alone_tied=[]
     pass_off_tied=[]
     # target confusion matrix
-    true_tar_ind=[]
     pred_tar_ind=[]
     pred_tar_ind_ml=[]
     # precision recall
@@ -151,7 +151,8 @@ if __name__ == '__main__':
             ind_sim.probs=param_tied_sim.probs
             chosen=np.argmax(param_tied_sim.probs.values())
             if genus==chosen:
-                correct_ml_tied[n]=1
+                correct_ml[n]=1
+            pred_percent_ml.append(max(param_tied_sim.probs.values()))
             correct_percent_ml_tied.append(sum(correct_ml_full)/(n+1))
             pred_tar_tied_ml.append(np.argmax(param_tied_sim.probs.values()))
 
@@ -167,7 +168,8 @@ if __name__ == '__main__':
                 ind_sim.probs[i]=1/num_tar
                 param_tied_sim.probs[i]=1/num_tar
             chosen=np.random.choice(choose_from)
-            correct_ml_tied[n]=chosen
+            pred_percent_ml.append(1/num_tar)
+            correct_ml[n]=chosen
             correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
             pred_tar_tied_ml.append(np.random.randint(num_tar))
 
@@ -238,7 +240,6 @@ if __name__ == '__main__':
         # building graphing parameters
         chosen=max(full_sim_probs)
         pred_percent_full.append(chosen)
-        true_tar_full.append(genus)
         pred_tar_full.append(np.argmax(full_sim_probs))
         if genus==np.argmax(full_sim_probs):
             correct_full[n]=1
@@ -254,7 +255,6 @@ if __name__ == '__main__':
         # building graphing parameters
         chosen=max(ind_sim_probs)
         pred_percent_ind.append(chosen)
-        true_tar_ind.append(genus)
         pred_tar_ind.append(np.argmax(ind_sim_probs))
         if genus==np.argmax(ind_sim_probs):
             correct_ind[n]=1
@@ -284,6 +284,8 @@ if __name__ == '__main__':
         graph_dic['correct_full']=correct_full
         graph_dic['pred_percent_ind']=pred_percent_ind
         graph_dic['correct_ind']=correct_ind
+        graph_dic['pred_percent_ml']=pred_percent_ml
+        graph_dic['correct_ml']=correct_ml
     else:
         graph_dic['pred_percent_tied']=None
         graph_dic['correct_tied']=None
@@ -295,9 +297,7 @@ if __name__ == '__main__':
     if graph_params['confusion']:
         graph_dic['true_tar_tied']=true_tar_tied
         graph_dic['pred_tar_tied']=pred_tar_tied
-        graph_dic['true_tar_full']=true_tar_full
         graph_dic['pred_tar_full']=pred_tar_full
-        graph_dic['true_tar_ind']=true_tar_ind
         graph_dic['pred_tar_ind']=pred_tar_ind
         graph_dic['pred_tar_ml']=pred_tar_tied_ml
         graph_dic['real_obs']=param_tied_sim.real_obs
@@ -305,9 +305,7 @@ if __name__ == '__main__':
     else:
         graph_dic['true_tar_tied']=None
         graph_dic['pred_tar_tied']=None
-        graph_dic['true_tar_full']=None
         graph_dic['pred_tar_full']=None
-        graph_dic['true_tar_ind']=None
         graph_dic['pred_tar_ind']=None
         graph_dic['pred_tar_ml']=None
         graph_dic['real_obs']=None
@@ -360,21 +358,13 @@ if __name__ == '__main__':
         graph_dic['alphas1_start']=None
 
     if graph_params['gibbs_val']:
-        graph_dic['theta2_samples']=param_tied_sim.X_samples
+        graph_dic['X_samples']=param_tied_sim.X_samples
+        graph_dic['theta2_samples']=theta2_samples
     else:
+        graph_dic['X_samples']=None
         graph_dic['theta2_samples']=None
 
 
-    # precision recall
-    pred_percent_full=[]
-    correct_full=[0]*num_events
-    # running average
-    correct_percent_full=[]
-    correct_ml_full=[0]*num_events
-    correct_percent_ml_full=[]
-    correct_ml_alone_full=[]
-    correct_percent_ml_alone_full=[]
-    pass_off_full=[]
     print "Ind percent,num:",correct_percent_ind[-1],np.mean(ind_number)
     print "Tied percent,num:",correct_percent_tied[-1],np.mean(tied_number)
     print "Full percent,num:",correct_percent_full[-1],np.mean(full_number)
