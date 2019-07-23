@@ -1,6 +1,5 @@
 starting_dist: 'assist' #uniform or assist
 num_tar: 5
-# threshold: 0.682
 threshold: 0.9
 human: 'good'
 sim_types:
@@ -11,9 +10,13 @@ sim_types:
 graphs:
     theta_val: True
     gibbs_val: False
-    sim_results_full: True
-    sim_results_tied: True
-    sim_results_ind: True
-    human_val: False
-    convergence: False
+    percent_correct: True
+    confusion: True
+    moment_match: False
+    data: True
+    precision_recall: False
+    pass_off: True
+    # sim_results_full: True
+    # sim_results_tied: True
+    # sim_results_ind: True
     timing: True

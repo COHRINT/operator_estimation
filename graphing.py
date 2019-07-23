@@ -114,42 +114,6 @@ class Graphing():
         #  self.convergence_validation()
 
 
-    def build_theta2(self,num_tar,alphas):
-        # make full theta2 table from param tied table
-        def select_index(tar,obs):
-            if tar*2==obs:
-                #tp
-                index=0
-            elif obs%2==0:
-                #fp
-                index=1
-            if tar*2+1==obs:
-                #fn
-                index=2
-            elif obs%2==1:
-                #tn
-                index=3
-            return index
-        theta2=np.empty((2*num_tar*num_tar,num_tar*2))
-        for i in range(theta2.shape[0]):
-            index1=select_index(int(i/(2*num_tar)),i%(2*num_tar))
-            for j in range(theta2.shape[1]):
-                index2=select_index(int(i/(2*num_tar)),j%(2*num_tar))
-                theta2[i,j]=alphas[index1,index2]
-        return theta2
-
-    def KLD(self,mean_i,mean_j,var_i,var_j):
-        dist=.5*((var_i**2/var_j**2)+var_j**2*(mean_j-mean_i)**2-1+np.log(var_j**2/var_i**2))
-        return np.absolute(dist)
-
-    def KLD_dirichlet(self,alphas1,alphas2):
-        "http://bariskurt.com/kullback-leibler-divergence-between-two-dirichlet-and-beta-distributions/"
-        a10=sum(alphas1)
-        a20=sum(alphas2)
-        final_term=0
-        for k in range(len(alphas1)):
-            final_term+=(alphas1[k]-alphas2[k])*(psi(alphas1[k])-psi(a10))
-        return np.log(gamma(a10))-sum(np.log(gamma(alphas1)))-np.log(gamma(a20))+sum(np.log(gamma(alphas2)))+final_term
 
     def lagk_correlation(self,data):
         "https://www.itl.nist.gov/div898/handbook/eda/section3/eda35c.htm"
@@ -375,6 +339,66 @@ class Graphing():
 
         fig.savefig('figures/percent_correct.png',bbox_inches='tight',pad_inches=0)
 
+
+    def timing(self,tied_times,tied_number,tied_match_times,full_times,full_number,
+            full_match_times,ind_times,ind_number,ind_match_times):
+        full_mean=np.mean(full_times)
+        full_std=np.std(full_times)
+        full_match=np.mean(full_match_times)
+        full_match_std=np.std(full_match_times)
+        full_avg_num=np.mean(full_number)
+
+        ind_mean=np.mean(ind_times)
+        ind_std=np.std(ind_times)
+        ind_match=np.mean(ind_match_times)
+        ind_match_std=np.std(ind_match_times)
+        ind_avg_num=np.mean(ind_number)
+
+        tied_mean=np.mean(tied_times)
+        tied_std=np.std(tied_times)
+        tied_match=np.mean(tied_match_times)
+        tied_match_std=np.std(tied_match_times)
+        tied_avg_num=np.mean(tied_number)
+
+        fig,ax=plt.subplots(nrows=1,ncols=2,tight_layout=True)
+        ax[0].bar(range(3),[ind_mean,tied_mean,full_mean],yerr=[ind_std,full_std,tied_std])
+        ax[0].xticks(range(3),('Ind','Tied','Full'))
+        ax[0].title('Average Time for Gibbs Sampling (5000 samples)')
+        ax[0].ylabel('Seconds')
+
+        ax[1].bar(range(3),[ind_match,tied_match,full_match],yerr=[ind_match_std,tied_match_std,
+            full_match_std],color='C1')
+        ax[1].xticks(range(3),('Ind','Tied','Full'))
+        ax[1].title('Average Time for Moment Matching')
+        ax[1].ylabel('Seconds')
+
+        plt.figure()
+        for i in range(int(tied_avg_num)):
+            plt.bar(1,tied_mean,color='C0',edgecolor='black',bottom=i*tied_mean)
+        plt.bar(1,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',
+                bottom=int(tied_avg_num)*tied_mean,label='sampling')
+        plt.bar(1,tied_match,color='C1',edgecolor='black',yerr=tied_match_std+tied_avg_num*tied_std,
+                bottom=tied_avg_num*tied_mean,label='moment match')
+
+        for i in range(int(ind_avg_num)):
+            plt.bar(0,ind_mean,color='C0',edgecolor='black',bottom=i*ind_mean)
+        for i in range(int(full_avg_num)):
+            plt.bar(2,full_mean,color='C0',edgecolor='black',bottom=i*full_mean)
+        plt.bar(2,(full_avg_num%1*full_mean),color='C0',edgecolor='black',
+                bottom=int(full_avg_num)*full_mean)
+        plt.bar(2,full_match,color='C1',edgecolor='black',yerr=full_match_std+full_avg_num*full_std,
+                bottom=full_avg_num*full_mean)
+        plt.bar(0,(ind_avg_num%1*ind_mean),color='C0',edgecolor='black',
+                bottom=int(ind_avg_num)*ind_mean)
+        plt.bar(0,ind_match,color='C1',edgecolor='black',yerr=ind_match_std+ind_avg_num*ind_std,
+                bottom=ind_avg_num*ind_mean)
+        plt.xticks(range(3),('Ind','Tied','Full'))
+
+        plt.title('Average Total Time for Classification')
+        plt.ylabel('Seconds')
+        plt.legend()
+
+    # --------------Not using these plots------------
     def experimental_results(self,true_tar,pred_tar,real_obs,pred_obs,num_events,correct_percent,
             correct_percent_ml,correct,pred_percent,style='(Tied)'):
         fig=plt.figure(figsize=(12,9))
@@ -579,116 +603,39 @@ class Graphing():
         fig.clear()
         plt.close()
 
-    def timing(self,tied_times,tied_number,tied_match_times,full_times=None,full_number=None,
-            full_match_times=None,ind_times=None,ind_number=None,ind_match_times=None):
-        if full_times is not None:
-            full_mean=np.mean(full_times)
-            full_std=np.std(full_times)
-            full_match=np.mean(full_match_times)
-            full_match_std=np.std(full_match_times)
-            full_avg_num=np.mean(full_number)
-        else:
-            full_mean=None
-            full_std=None
-            full_match=None
-            full_match_std=None
-            full_avg_num=None
-        if ind_times is not None:
-            ind_mean=np.mean(ind_times)
-            ind_std=np.std(ind_times)
-            ind_match=np.mean(ind_match_times)
-            ind_match_std=np.std(ind_match_times)
-            ind_avg_num=np.mean(ind_number)
-        else:
-            ind_mean=None
-            ind_std=None
-            ind_match=None
-            ind_match_std=None
-            ind_avg_num=None
-        tied_mean=np.mean(tied_times)
-        tied_std=np.std(tied_times)
-        tied_match=np.mean(tied_match_times)
-        tied_match_std=np.std(tied_match_times)
-        tied_avg_num=np.mean(tied_number)
+    def KLD(self,mean_i,mean_j,var_i,var_j):
+        dist=.5*((var_i**2/var_j**2)+var_j**2*(mean_j-mean_i)**2-1+np.log(var_j**2/var_i**2))
+        return np.absolute(dist)
 
-        plt.figure()
-        if (full_times is not None) and (ind_times is not None):
-            plt.bar(range(3),[ind_mean,tied_mean,full_mean],yerr=[ind_std,full_std,tied_std])
-            plt.xticks(range(3),('Ind','Tied','Full'))
-        elif full_times is not None:
-            plt.bar(range(2),[tied_mean,full_mean],yerr=[full_std,tied_std])
-            plt.xticks(range(2),('Tied','Full'))
-        elif ind_times is not None:
-            plt.bar(range(2),[tied_mean,ind_mean],yerr=[ind_std,tied_std])
-            plt.xticks(range(2),('Tied','Ind'))
-        plt.title('Average Time for Gibbs Sampling (5000 samples)')
-        plt.ylabel('Seconds')
+    def KLD_dirichlet(self,alphas1,alphas2):
+        "http://bariskurt.com/kullback-leibler-divergence-between-two-dirichlet-and-beta-distributions/"
+        a10=sum(alphas1)
+        a20=sum(alphas2)
+        final_term=0
+        for k in range(len(alphas1)):
+            final_term+=(alphas1[k]-alphas2[k])*(psi(alphas1[k])-psi(a10))
+        return np.log(gamma(a10))-sum(np.log(gamma(alphas1)))-np.log(gamma(a20))+sum(np.log(gamma(alphas2)))+final_term
 
-        plt.figure()
-        if (full_match is not None) and (ind_match is not None):
-            plt.bar(range(3),[ind_match,tied_match,full_match],yerr=[ind_match_std,tied_match_std,full_match_std],color='C1')
-            plt.xticks(range(3),('Ind','Tied','Full'))
-        elif full_match is not None:
-            plt.bar(range(2),[tied_match,full_match],yerr=[tied_match_std,full_match_std],color='C1')
-            plt.xticks(range(2),('Tied','Full'))
-        elif ind_match is not None:
-            plt.bar(range(2),[tied_match,ind_match],yerr=[tied_match_std,ind_match_std],color='C1')
-            plt.xticks(range(2),('Tied','Ind'))
-        plt.title('Average Time for Moment Matching')
-        plt.ylabel('Seconds')
-
-        plt.figure()
-        if (full_times is not None) and (ind_times is not None):
-            for i in range(int(tied_avg_num)):
-                plt.bar(1,tied_mean,color='C0',edgecolor='black',bottom=i*tied_mean)
-            plt.bar(1,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',
-                    bottom=int(tied_avg_num)*tied_mean,label='sampling')
-            plt.bar(1,tied_match,color='C1',edgecolor='black',yerr=tied_match_std+tied_avg_num*tied_std,
-                    bottom=tied_avg_num*tied_mean,label='moment match')
-        else:
-            for i in range(int(tied_avg_num)):
-                plt.bar(0,tied_mean,color='C0',edgecolor='black',bottom=i*tied_mean)
-            plt.bar(0,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',
-                    bottom=int(tied_avg_num)*tied_mean,label='sampling')
-            plt.bar(0,tied_match,color='C1',edgecolor='black',yerr=tied_match_std+tied_avg_num*tied_std,
-                    bottom=tied_avg_num*tied_mean,label='moment match')
-
-        if (full_times is not None) and (ind_times is not None):
-            for i in range(int(ind_avg_num)):
-                plt.bar(0,ind_mean,color='C0',edgecolor='black',bottom=i*ind_mean)
-            for i in range(int(full_avg_num)):
-                plt.bar(2,full_mean,color='C0',edgecolor='black',bottom=i*full_mean)
-            plt.bar(2,(full_avg_num%1*full_mean),color='C0',edgecolor='black',
-                    bottom=int(full_avg_num)*full_mean)
-            plt.bar(2,full_match,color='C1',edgecolor='black',yerr=full_match_std+full_avg_num*full_std,
-                    bottom=full_avg_num*full_mean)
-            plt.bar(0,(ind_avg_num%1*ind_mean),color='C0',edgecolor='black',
-                    bottom=int(ind_avg_num)*ind_mean)
-            plt.bar(0,ind_match,color='C1',edgecolor='black',yerr=ind_match_std+ind_avg_num*ind_std,
-                    bottom=ind_avg_num*ind_mean)
-            plt.xticks(range(3),('Ind','Tied','Full'))
-        elif full_match is not None:
-            for i in range(int(full_avg_num)):
-                plt.bar(1,full_mean,color='C0',edgecolor='black',bottom=i*full_mean)
-            plt.bar(1,(full_avg_num%1*full_mean),color='C0',edgecolor='black',
-                    bottom=int(full_avg_num)*full_mean)
-            plt.bar(1,full_match,color='C1',edgecolor='black',yerr=full_match_std+full_avg_num*full_std,
-                    bottom=full_avg_num*full_mean)
-            plt.xticks(range(2),('Tied','Full'))
-        elif ind_times is not None:
-            for i in range(int(ind_avg_num)):
-                plt.bar(0,ind_mean,color='C0',edgecolor='black',bottom=i*ind_mean)
-            plt.bar(1,(ind_avg_num%1*ind_mean),color='C0',edgecolor='black',
-                    bottom=int(ind_avg_num)*ind_mean)
-            plt.bar(1,ind_match,color='C1',edgecolor='black',yerr=ind_match_std+ind_avg_num*ind_std,
-                    bottom=ind_avg_num*ind_mean)
-            plt.xticks(range(2),('Tied','Ind'))
-
-        plt.title('Average Total Time for Classification')
-        plt.ylabel('Seconds')
-        plt.legend()
-
-
-    def accuracy_comparison(self):
-        # compare between independent and dependent
-        pass
+    def build_theta2(self,num_tar,alphas):
+        # make full theta2 table from param tied table
+        def select_index(tar,obs):
+            if tar*2==obs:
+                #tp
+                index=0
+            elif obs%2==0:
+                #fp
+                index=1
+            if tar*2+1==obs:
+                #fn
+                index=2
+            elif obs%2==1:
+                #tn
+                index=3
+            return index
+        theta2=np.empty((2*num_tar*num_tar,num_tar*2))
+        for i in range(theta2.shape[0]):
+            index1=select_index(int(i/(2*num_tar)),i%(2*num_tar))
+            for j in range(theta2.shape[1]):
+                index2=select_index(int(i/(2*num_tar)),j%(2*num_tar))
+                theta2[i,j]=alphas[index1,index2]
+        return theta2

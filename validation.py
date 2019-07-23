@@ -174,7 +174,6 @@ class Human():
         return np.random.choice(range(2*num_tar),p=prob)
         #  return obs
 
-
 class DataFusion(Human):
     def __init__(self,num_tar):
         self.hmm=HMM_Classification()
@@ -461,6 +460,8 @@ class DataFusion(Human):
 
     def moment_matching(self,graph=False):
         # moment matching of alphas from samples (Minka, 2000)
+        if graph:
+            fig,ax=plt.subplots(nrows=1,ncols=2,tight_layout=True)
         sample_counts=np.zeros((4,4))
         for n in range(4):
             sum_alpha=sum(self.theta2[n,:])
@@ -482,18 +483,23 @@ class DataFusion(Human):
                         for w in range(5):
                             alphak-=((psi(alphak)-y)/polygamma(1,alphak))
                         self.theta2[n,k]=alphak
-                    #DEBUG
                     if graph:
                         if (n==0) and (k==0):
-                            plt.figure()
-                            plt.hist(samples,bins=20,density=True)
+                            ax[0].hist(samples,bins=20,density=True)
                             x=np.linspace(0,1)
-                            plt.plot(x,scipy.stats.beta.pdf(x,alphak,sum(self.theta2[n,:])-alphak))
-                            plt.xlabel(r'$\theta_2$')
-                            plt.ylabel(r'$p(\theta_2)$')
-                            plt.title("Moment Matching for TP,TP")
-                            plt.show()
-                            sys.exit()
+                            ax[0].plot(x,scipy.stats.beta.pdf(x,alphak,sum(self.theta2[n,:])-alphak))
+                            ax[0].xlabel(r'$\theta_2$')
+                            ax[0].ylabel(r'$p(\theta_2)$')
+                            ax[0].title("Moment Matching for TP,TP")
+                        elif (n==1) and (k==0):
+                            ax[1].hist(samples,bins=20,density=True)
+                            x=np.linspace(0,1)
+                            ax[1].plot(x,scipy.stats.beta.pdf(x,alphak,sum(self.theta2[n,:])-alphak))
+                            ax[1].xlabel(r'$\theta_2$')
+                            ax[1].ylabel(r'$p(\theta_2)$')
+                            ax[1].title("Moment Matching for FP,TP")
+        if graph:
+            fig.savefig('figures/moment_matching.png',bbox_inches='tight',pad_inches=0)
 
     def moment_matching_small(self):
         # moment matching of alphas from samples (Minka, 2000)
@@ -608,6 +614,7 @@ class DataFusion(Human):
         else:
             index=select_index(target,current_obs)
             return index
+
 
     def VOI(self,num_tar,obs,threshold):
         post=copy.deepcopy(self.probs.values())
