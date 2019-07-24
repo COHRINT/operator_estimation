@@ -9,13 +9,14 @@ sim_types:
     ind_dir: True
 graphs:
     theta_val: True
-    gibbs_val: False
+    gibbs_val: True
     percent_correct: True
     confusion: True
-    moment_match: False
+    moment_match: True
+    # data and pass_off only work with assist starting dist, no data is needed for uniform
     data: True
-    precision_recall: False
     pass_off: True
+    precision_recall: True
     # sim_results_full: True
     # sim_results_tied: True
     # sim_results_ind: True

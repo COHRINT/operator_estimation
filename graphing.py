@@ -23,24 +23,32 @@ class Graphing():
     def __init__(self,graph_dic):
         #  self.gif_time=10 #seconds
 
+        num_tar=graph_dic['num_tar']
+        num_events=graph_dic['num_events']
         # percent correct
         correct_percent_tied=graph_dic['correct_percent_tied']
         correct_percent_full=graph_dic['correct_percent_full']
         correct_percent_ind=graph_dic['correct_percent_ind']
         correct_percent_ml=graph_dic['correct_percent_ml']
+        correct_percent_ml_alone=graph_dic['correct_percent_ml_alone']
         # precision recall
         pred_percent_tied=graph_dic['pred_percent_tied']
         pred_percent_full=graph_dic['pred_percent_full']
         pred_percent_ind=graph_dic['pred_percent_ind']
+        pred_percent_ml=graph_dic['pred_percent_ml']
+        pred_percent_ml_alone=graph_dic['pred_percent_ml_alone']
         correct_tied=graph_dic['correct_tied']
         correct_full=graph_dic['correct_full']
         correct_ind=graph_dic['correct_ind']
+        correct_ml=graph_dic['correct_ml']
+        correct_ml_alone=graph_dic['correct_ml_alone']
         # confusion
         true_tar_tied=graph_dic['true_tar_tied']
         pred_tar_tied=graph_dic['pred_tar_tied']
         pred_tar_full=graph_dic['pred_tar_full']
         pred_tar_ind=graph_dic['pred_tar_ind']
-        pred_tar_tied_ml=graph_dic['pred_tar_ml']
+        pred_tar_ml=graph_dic['pred_tar_ml']
+        pred_tar_ml_alone=graph_dic['pred_tar_ml_alone']
         real_obs=graph_dic['real_obs']
         pred_obs=graph_dic['pred_obs']
         # timing
@@ -58,11 +66,15 @@ class Graphing():
         theta1_correct=graph_dic['theta1_correct']
         theta2=graph_dic['theta2']
         theta2_correct=graph_dic['theta2_correct']
-        alphas_startgraph_dic['alphas_start']
+        alphas_start=graph_dic['alphas_start']
         alphas1_start=graph_dic['alphas1_start']
         #gibbs val
         theta2_samples=graph_dic['theta2_samples'] 
         X_samples=graph_dic['X_samples']
+        # data
+        data_dic=graph_dic['data']
+        # pass off
+        pass_off_average=graph_dic['pass_off']
 
        
         if (theta2_correct is not None) and (alphas_start is not None) and (theta2 is not None):
@@ -81,17 +93,36 @@ class Graphing():
                     full_match_times,ind_times,ind_number,ind_match_times)
 
         if (true_tar_tied is not None) and (pred_tar_tied is not None) and \
-                (pred_tar_full is not None) and (pred_tar_ind is not None) \
-                and (pred_tar_ml is not None) and (real_obs is not None) and (pred_obs is not None):
+                (pred_tar_full is not None) and (pred_tar_ind is not None) and \
+                (pred_tar_ml is not None) and (pred_tar_ml_alone is not None) and \
+                (real_obs is not None) and (pred_obs is not None):
             print "Making Confusion Matrixes"
             self.confusion(true_tar_tied,pred_tar_tied,pred_tar_full,pred_tar_ind,pred_tar_ml,
-                    real_obs,pred_obs)
+                    pred_tar_ml_alone,real_obs,pred_obs)
+
+        if (pred_percent_tied is not None) and (correct_tied is not None) and \
+                (pred_percent_full is not None) and (correct_full is not None) and \
+                (pred_percent_ind is not None) and (correct_ind is not None) and \
+                (pred_percent_ml is not None) and (correct_ml is not None) and \
+                (pred_percent_ml_alone is not None) and (correct_ml_alone is not None):
+            print "Making Precision-Recall Graphs"
+            self.precision_recall_graph(correct_tied,pred_percent_tied,correct_full,pred_percent_full,
+            correct_ind,pred_percent_ind,correct_ml,pred_percent_ml,correct_ml_alone,
+            pred_percent_ml_alone)
 
         if (correct_percent_tied is not None) and (correct_percent_ml is not None) \
                 and (correct_percent_full is not None) and (correct_percent_ind is not None):
             print "Making Percent Correct Plot"
-            self.percent_correct(num_events,correct_percent_tied,correct_percent_ml_tied,
-                    correct_percent_full,correct_percent_ind)
+            self.percent_correct(num_events,correct_percent_tied,correct_percent_ml,
+                    correct_percent_full,correct_percent_ind,correct_percent_ml_alone)
+        
+        if data_dic is not None:
+            print "Making Data Graph"
+            self.data_graph(num_tar,data_dic)
+
+        if pass_off_average is not None:
+            print "Making Pass Off Graph"
+            self.pass_off_graph(num_events,pass_off_average)
         #  print "Making Theta2 Validation GIF"
         #  self.human_validation()
         #  print "Making Convergence GIF"
@@ -281,88 +312,79 @@ class Graphing():
 
         #  fig1.savefig('figures/gibbs_validation_theta.png',bbox_inches='tight',pad_inches=0)
 
-    def confusion(self,true_tar_tied,pred_tar_tied,pred_tar_full,pred_tar_ind,pred_tar_ml,real_obs,pred_obs):
-        fig,ax=plt.subplots(nrows=3,ncols=2,tight_layout=True)
+    def confusion(self,true_tar_tied,pred_tar_tied,pred_tar_full,pred_tar_ind,pred_tar_ml,pred_tar_ml_alone,real_obs,pred_obs):
+        fig,ax=plt.subplots(nrows=2,ncols=3,tight_layout=True)
         # Tied
         cm=confusion_matrix(true_tar_tied,pred_tar_tied)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[0].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[0].set_ylabel('True Label')
-        ax[0].set_xlabel('Given Label')
-        ax[0].set_title('Tied Sim')
+        ax[0,0].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        ax[0,0].set_ylabel('True Label')
+        ax[0,0].set_xlabel('Given Label')
+        ax[0,0].set_title('Tied Sim')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[0].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            ax[0,0].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # Full
         cm=confusion_matrix(true_tar_tied,pred_tar_full)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[1].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[1].set_ylabel('True Label')
-        ax[1].set_xlabel('Given Label')
-        ax[1].set_title('Full Sim')
+        ax[0,1].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        ax[0,1].set_ylabel('True Label')
+        ax[0,1].set_xlabel('Given Label')
+        ax[0,1].set_title('Full Sim')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[1].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            ax[0,1].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # Ind
         cm=confusion_matrix(true_tar_tied,pred_tar_ind)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[2].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[2].set_ylabel('True Label')
-        ax[2].set_xlabel('Given Label')
-        ax[2].set_title('Ind Sim')
+        ax[0,2].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        ax[0,2].set_ylabel('True Label')
+        ax[0,2].set_xlabel('Given Label')
+        ax[0,2].set_title('Ind Sim')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[2].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            ax[0,2].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # ML
         cm=confusion_matrix(true_tar_tied,pred_tar_ml)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[3].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[3].set_ylabel('True Label')
-        ax[3].set_xlabel('Given Label')
-        ax[3].set_title('ML Sim')
+        ax[1,0].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        ax[1,0].set_ylabel('True Label')
+        ax[1,0].set_xlabel('Given Label')
+        ax[1,0].set_title('HMM Sim')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[3].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            ax[1,0].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # ML no pass
-        #TODO
-        #  cm=confusion_matrix(true_tar_tied,pred_tar_ml)
-        #  cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        #  ax[4].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        #  ax[4].set_ylabel('True Label')
-        #  ax[4].set_xlabel('Given Label')
-        #  ax[4].set_title('ML No Human Sim')
-        #  for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-        #      ax[4].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+        cm=confusion_matrix(true_tar_tied,pred_tar_ml_alone)
+        cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
+        ax[1,1].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        ax[1,1].set_ylabel('True Label')
+        ax[1,1].set_xlabel('Given Label')
+        ax[1,1].set_title('HMM No Human Sim')
+        for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
+            ax[1,1].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # human
         cm=confusion_matrix(real_obs,pred_obs)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[5].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[5].set_ylabel('True Value')
-        ax[5].set_xlabel('Given Obs')
-        ax[5].set_xticks([0,1],['pos','neg'])
-        ax[5].set_yticks([0,1],['pos','neg'])
-        ax[5].set_title('Human Operator')
+        ax[1,2].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        ax[1,2].set_ylabel('True Value')
+        ax[1,2].set_xlabel('Given Obs')
+        ax[1,2].set_xticks([0,1],['pos','neg'])
+        ax[1,2].set_yticks([0,1],['pos','neg'])
+        ax[1,2].set_title('Human Operator')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[5].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            ax[1,2].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         fig.savefig('figures/confusion.png',bbox_inches='tight',pad_inches=0)
 
-    def percent_correct(self,num_events,correct_percent,correct_percent_ml,correct_percent_full=None,correct_percent_ind=None):
+    def percent_correct(self,num_events,correct_percent,correct_percent_ml,correct_percent_full,correct_percent_ind,correct_percent_ml_alone):
         fig=plt.figure()
-        if (correct_percent_full is not None) and (correct_percent_ind is not None):
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind[5:], label="w/Human Total Correct (Ind)")
-        elif correct_percent_full is not None:
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
-        elif correct_percent_ind is not None:
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind[5:], label="w/Human Total Correct (Ind)")
-        else:
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct")
-        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml[5:], label="No Human Total Correct")
+        plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
+        plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
+        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind[5:], label="w/Human Total Correct (Ind)")
+        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml[5:], label="Before Human Total Correct")
+        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml_alone[5:], label="No Human Total Correct")
         plt.legend()
         plt.xlabel('Number of Targets')
         plt.ylabel('Percent Correct')
@@ -370,7 +392,6 @@ class Graphing():
         plt.title('Correct Classification')
 
         fig.savefig('figures/percent_correct.png',bbox_inches='tight',pad_inches=0)
-
 
     def timing(self,tied_times,tied_number,tied_match_times,full_times,full_number,
             full_match_times,ind_times,ind_number,ind_match_times):
@@ -392,7 +413,7 @@ class Graphing():
         tied_match_std=np.std(tied_match_times)
         tied_avg_num=np.mean(tied_number)
 
-        fig,ax=plt.subplots(nrows=1,ncols=2,tight_layout=True)
+        fig1,ax=plt.subplots(nrows=1,ncols=2,tight_layout=True)
         ax[0].bar(range(3),[ind_mean,tied_mean,full_mean],yerr=[ind_std,full_std,tied_std])
         ax[0].set_xticks(range(3),('Ind','Tied','Full'))
         ax[0].set_title('Average Time for Gibbs Sampling (5000 samples)')
@@ -404,7 +425,7 @@ class Graphing():
         ax[1].set_title('Average Time for Moment Matching')
         ax[1].set_ylabel('Seconds')
 
-        plt.figure()
+        fig2=plt.figure()
         for i in range(int(tied_avg_num)):
             plt.bar(1,tied_mean,color='C0',edgecolor='black',bottom=i*tied_mean)
         plt.bar(1,(tied_avg_num%1*tied_mean),color='C0',edgecolor='black',
@@ -429,6 +450,87 @@ class Graphing():
         plt.title('Average Total Time for Classification')
         plt.ylabel('Seconds')
         plt.legend()
+
+        fig1.savefig('figures/timing_parts.png',bbox_inches='tight',pad_inches=0)
+        fig2.savefig('figures/timing_total.png',bbox_inches='tight',pad_inches=0)
+
+    def precision_recall_graph(self,correct_tied,pred_percent_tied,correct_full,pred_percent_full,
+            correct_ind,pred_percent_ind,correct_ml,pred_percent_ml,correct_ml_alone,
+            pred_percent_ml_alone):
+        #TODO: maybe do this with subplots, not axes subplots
+        fig,ax=plt.subplots(nrows=2,ncols=3,tight_layout=True)
+        # Tied
+        precision, recall, _ =precision_recall_curve(correct_tied,pred_percent_tied)
+        ax[0,0].step(recall,precision,where='post')
+        ax[0,0].set_xlim([0.0,1.0])
+        ax[0,0].set_ylim([0.0,1.0])
+        ax[0,0].set_xlabel('Recall')
+        ax[0,0].set_ylabel('Precission')
+        ax[0,0].set_title('Tied Sim')
+
+        # Full
+        precision, recall, _ =precision_recall_curve(correct_full,pred_percent_full)
+        ax[0,1].step(recall,precision,where='post')
+        ax[0,1].set_xlim([0.0,1.0])
+        ax[0,1].set_ylim([0.0,1.0])
+        ax[0,1].set_xlabel('Recall')
+        ax[0,1].set_ylabel('Precission')
+        ax[0,1].set_title('Full Sim')
+
+        # Ind
+        precision, recall, _ =precision_recall_curve(correct_ind,pred_percent_ind)
+        ax[0,2].step(recall,precision,where='post')
+        ax[0,2].set_xlim([0.0,1.0])
+        ax[0,2].set_ylim([0.0,1.0])
+        ax[0,2].set_xlabel('Recall')
+        ax[0,2].set_ylabel('Precission')
+        ax[0,2].set_title('Ind Sim')
+
+        # ML
+        precision, recall, _ =precision_recall_curve(correct_ml,pred_percent_ml)
+        ax[1,0].step(recall,precision,where='post')
+        ax[1,0].set_xlim([0.0,1.0])
+        ax[1,0].set_ylim([0.0,1.0])
+        ax[1,0].set_xlabel('Recall')
+        ax[1,0].set_ylabel('Precission')
+        ax[1,0].set_title('HMM Sim')
+
+        # ML no pass
+        precision, recall, _ =precision_recall_curve(correct_ml_alone,pred_percent_ml_alone)
+        ax[1,1].step(recall,precision,where='post')
+        ax[1,1].set_xlim([0.0,1.0])
+        ax[1,1].set_ylim([0.0,1.0])
+        ax[1,1].set_xlabel('Recall')
+        ax[1,1].set_ylabel('Precission')
+        ax[1,1].set_title('HMM No Human Sim')
+
+        fig.savefig('figures/precision_recall.png',bbox_inches='tight',pad_inches=0)
+
+    def data_graph(self,num_tar,data_dic):
+        fig=plt.figure()
+        for i in range(num_tar):
+            data=np.zeros((len(data_dic[i]),100))
+            for trial in range(len(data_dic[i])):
+                data[trial,:]=data_dic[i][trial]
+            mean_data=np.mean(data,axis=0)
+            std_data=np.std(data,axis=0)
+            plt.plot(range(len(mean_data)),mean_data,label=i)
+            plt.fill_between(range(len(mean_data)),mean_data+std_data,mean_data-std_data,alpha=0.5)
+        plt.xlabel('Time (Frames)')
+        plt.ylabel('Intensity (Units)')
+        plt.title('Average Data Seen')
+        plt.legend()
+
+        fig.savefig('figures/data.png',bbox_inches='tight',pad_inches=0)
+
+    def pass_off_graph(self,num_events,pass_off_average):
+        fig=plt.figure()
+        plt.plot([n+5 for n in range(num_events-5)],pass_off_average[5:])
+        plt.xlabel('Number of Targets')
+        plt.ylabel('Average Pass Off Frame')
+        plt.title('Average Pass Off Frame Over Time')
+
+        fig.savefig('figures/pass_off.png',bbox_inches='tight',pad_inches=0)
 
     # --------------Not using these plots------------
     def experimental_results(self,true_tar,pred_tar,real_obs,pred_obs,num_events,correct_percent,

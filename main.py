@@ -54,35 +54,37 @@ if __name__ == '__main__':
     threshold=cfg['threshold']
     human_type=cfg['human']
 
+    #data
+    data_dic={}
+    for i in range(num_tar):
+        data_dic[i]=[]
     # target confusion matrix
     pred_tar_full=[]
-    pred_tar_full_ml=[]
     # precision recall
     pred_percent_full=[]
     correct_full=[0]*num_events
     # running average
     correct_percent_full=[]
-    correct_ml_full=[0]*num_events
-    correct_percent_ml_full=[]
-    correct_ml_alone_full=[]
-    correct_percent_ml_alone_full=[]
-    pass_off_full=[]
     # target confusion matrix
     true_tar_tied=[]
     pred_tar_tied=[]
-    pred_tar_tied_ml=[]
+    pred_tar_ml=[]
+    pred_tar_ml_alone=[]
     # precision recall
     pred_percent_tied=[]
     correct_tied=[0]*num_events
     pred_percent_ml=[]
+    pred_percent_ml_alone=[]
     correct_ml=[0]*num_events
+    correct_ml_alone=[0]*num_events
     # running average
     correct_percent_tied=[]
-    correct_ml_tied=[0]*num_events
-    correct_percent_ml_tied=[]
-    correct_ml_alone_tied=[]
-    correct_percent_ml_alone_tied=[]
-    pass_off_tied=[]
+    correct_ml=[0]*num_events
+    correct_percent_ml=[]
+    correct_ml_alone=[0]*num_events
+    correct_percent_ml_alone=[]
+    pass_off_tracker=[0]*num_events
+    pass_off_average=[]
     # target confusion matrix
     pred_tar_ind=[]
     pred_tar_ind_ml=[]
@@ -91,11 +93,6 @@ if __name__ == '__main__':
     correct_ind=[0]*num_events
     # running average
     correct_percent_ind=[]
-    correct_ml_ind=[0]*num_events
-    correct_percent_ml_ind=[]
-    correct_ml_alone_ind=[]
-    correct_percent_ml_alone_ind=[]
-    pass_off_ind=[]
 
     # timing
     full_times=[]
@@ -135,6 +132,7 @@ if __name__ == '__main__':
             #  ml_threshold=0.25
             pass_off=0
             param_tied_sim.make_data(genus)
+            data_dic[genus].append(param_tied_sim.intensity_data)
             param_tied_sim.frame=0
             param_tied_sim.alphas={}
             param_tied_sim.probs={}
@@ -143,18 +141,30 @@ if __name__ == '__main__':
                 param_tied_sim.probs[i]=1/num_tar
             #  while max(param_tied_sim.probs.values())<ml_threshold:
             while (pass_off==0) and (param_tied_sim.frame<100):
-                param_tied_sim.updateProbsML()
+                param_tied_sim.probs=param_tied_sim.updateProbsML()
                 param_tied_sim.frame+=1
                 pass_off=param_tied_sim.VOI2(num_tar,threshold,param_tied_sim.probs)
-            print param_tied_sim.frame
-            full_sim.probs=param_tied_sim.probs
-            ind_sim.probs=param_tied_sim.probs
+            #  print param_tied_sim.frame
+            pass_off_tracker[n]=param_tied_sim.frame
+            pass_off_average.append(np.mean(pass_off_tracker))
+            full_sim.probs=copy.copy(param_tied_sim.probs)
+            ind_sim.probs=copy.copy(param_tied_sim.probs)
             chosen=np.argmax(param_tied_sim.probs.values())
             if genus==chosen:
                 correct_ml[n]=1
             pred_percent_ml.append(max(param_tied_sim.probs.values()))
-            correct_percent_ml_tied.append(sum(correct_ml_full)/(n+1))
-            pred_tar_tied_ml.append(np.argmax(param_tied_sim.probs.values()))
+            correct_percent_ml.append(sum(correct_ml)/(n+1))
+            pred_tar_ml.append(np.argmax(param_tied_sim.probs.values()))
+            #continue even after passing off for comparison
+            continue_probs=copy.copy(param_tied_sim.probs)
+            while param_tied_sim.frame<100:
+                continue_probs=param_tied_sim.updateProbsML()
+                param_tied_sim.frame+=1
+            if genus==np.argmax(continue_probs.values()):
+                correct_ml_alone[n]=1
+            pred_percent_ml_alone.append(max(continue_probs.values()))
+            correct_percent_ml_alone.append(sum(correct_ml_alone)/(n+1))
+            pred_tar_ml_alone.append(np.argmax(continue_probs.values()))
 
         elif cfg['starting_dist']=='uniform':
             choose_from=[1]
@@ -170,8 +180,13 @@ if __name__ == '__main__':
             chosen=np.random.choice(choose_from)
             pred_percent_ml.append(1/num_tar)
             correct_ml[n]=chosen
-            correct_percent_ml_tied.append(sum(correct_ml_tied)/(n+1))
+            correct_percent_ml.append(sum(correct_ml)/(n+1))
             pred_tar_tied_ml.append(np.random.randint(num_tar))
+
+            correct_ml_alone[n]=chosen
+            pred_percent_ml_alone=copy.copy(pred_percent_ml)
+            correct_percent_ml_alone=copy.copy(correct_percent_ml)
+            pred_tar_ml_alone=copy.copy(pred_tar_ml)
 
         obs=[]
         start_tar=time.time()
@@ -182,7 +197,7 @@ if __name__ == '__main__':
         count_tied=0
         count_ind=0
         while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold) or (max(ind_sim_probs)<threshold):
-            if time.time()-start_tar>30:
+            if time.time()-start_tar>5:
                 break
             #  tar_to_ask=None
             #  if count_tied>0:
@@ -270,7 +285,8 @@ if __name__ == '__main__':
         graph_dic['correct_percent_tied']=correct_percent_tied
         graph_dic['correct_percent_full']=correct_percent_full
         graph_dic['correct_percent_ind']=correct_percent_ind
-        graph_dic['correct_precent_ml']=correct_percent_ml_tied
+        graph_dic['correct_percent_ml']=correct_percent_ml
+        graph_dic['correct_percent_ml_alone']=correct_percent_ml_alone
     else:
         graph_dic['correct_percent_tied']=None
         graph_dic['correct_percent_full']=None
@@ -286,6 +302,8 @@ if __name__ == '__main__':
         graph_dic['correct_ind']=correct_ind
         graph_dic['pred_percent_ml']=pred_percent_ml
         graph_dic['correct_ml']=correct_ml
+        graph_dic['pred_percent_ml_alone']=pred_percent_ml_alone
+        graph_dic['correct_ml_alone']=correct_ml_alone
     else:
         graph_dic['pred_percent_tied']=None
         graph_dic['correct_tied']=None
@@ -299,7 +317,8 @@ if __name__ == '__main__':
         graph_dic['pred_tar_tied']=pred_tar_tied
         graph_dic['pred_tar_full']=pred_tar_full
         graph_dic['pred_tar_ind']=pred_tar_ind
-        graph_dic['pred_tar_ml']=pred_tar_tied_ml
+        graph_dic['pred_tar_ml']=pred_tar_ml
+        graph_dic['pred_tar_ml_alone']=pred_tar_ml_alone
         graph_dic['real_obs']=param_tied_sim.real_obs
         graph_dic['pred_obs']=param_tied_sim.pred_obs
     else:
@@ -312,14 +331,14 @@ if __name__ == '__main__':
         graph_dic['pred_obs']=None
 
     if graph_params['data']:
-        pass
+        graph_dic['data']=data_dic
     else:
-        pass
+        graph_dic['data']=None
 
     if graph_params['pass_off']:
-        pass
+        graph_dic['pass_off']=pass_off_average
     else:
-        pass
+        graph_dic['pass_off']=None
 
     if graph_params['timing']:
         graph_dic['tied_times']=tied_times
@@ -369,12 +388,4 @@ if __name__ == '__main__':
     print "Tied percent,num:",correct_percent_tied[-1],np.mean(tied_number)
     print "Full percent,num:",correct_percent_full[-1],np.mean(full_number)
     Graphing(graph_dic)
-    #  graphs=Graphing(num_events,num_tar,alphas_start,theta2,true_tar_full,
-    #          pred_tar_full,real_obs,pred_obs,pred_tar_ml,correct_percent_full,
-    #          correct_percent_ml_full,correct_full,pred_percent_full,true_tar_tied,
-    #          pred_tar_tied,correct_percent_tied,correct_percent_ml_tied,correct_tied,
-    #          pred_percent_tied,theta2_correct,theta2_samples,X_samples,full_times,
-    #          tied_times,full_number,tied_number,full_match_times,tied_match_times,
-    #          alphas1_start,theta1,theta1_correct,correct_percent_ind,true_tar_ind,
-    #          pred_tar_ind,ind_times,ind_number,ind_match_times)
-    #  plt.show()
+    plt.show()

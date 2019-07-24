@@ -233,6 +233,7 @@ class DataFusion(Human):
             plt.show()
 
     def updateProbsML(self):
+        probs={}
         data=self.intensity_data[self.frame]
         #forward algorithm
         for i in self.names:
@@ -241,7 +242,8 @@ class DataFusion(Human):
         #  self.probs[i]=self.probs[i]*sum(self.alphas[i])
         prob_norm=self.hmm.expNormalize(self.norm_const[:,:self.frame+1])
         for i in self.names:
-            self.probs[i]=prob_norm[self.names.index(i)]
+            probs[i]=prob_norm[self.names.index(i)]
+        return probs
         #noramlize
         #  suma=sum(self.probs.values())
         #  for i in self.names:
