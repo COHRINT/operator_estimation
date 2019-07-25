@@ -313,7 +313,6 @@ class Graphing():
         #  fig1.savefig('figures/gibbs_validation_theta.png',bbox_inches='tight',pad_inches=0)
 
     def confusion(self,true_tar_tied,pred_tar_tied,pred_tar_full,pred_tar_ind,pred_tar_ml,pred_tar_ml_alone,real_obs,pred_obs):
-        #  fig,ax=plt.subplots(nrows=2,ncols=3,figsize=((15,10)),tight_layout=True)
         fig=plt.figure(figsize=((15,10)),tight_layout=True)
         # Tied
         plt.subplot(231)

@@ -197,7 +197,7 @@ if __name__ == '__main__':
         count_tied=0
         count_ind=0
         while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold) or (max(ind_sim_probs)<threshold):
-            if time.time()-start_tar>5:
+            if time.time()-start_tar>30:
                 break
             #  tar_to_ask=None
             #  if count_tied>0:
