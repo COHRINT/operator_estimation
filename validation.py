@@ -463,7 +463,7 @@ class DataFusion(Human):
     def moment_matching(self,graph=False):
         # moment matching of alphas from samples (Minka, 2000)
         if graph:
-            fig,ax=plt.subplots(nrows=1,ncols=2,tight_layout=True)
+            fig,ax=plt.subplots(nrows=1,ncols=2,figsize=((8,4)),tight_layout=True)
         sample_counts=np.zeros((4,4))
         for n in range(4):
             sum_alpha=sum(self.theta2[n,:])

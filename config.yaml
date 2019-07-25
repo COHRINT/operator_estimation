@@ -2,22 +2,14 @@ starting_dist: 'assist' #uniform or assist
 num_tar: 5
 threshold: 0.9
 human: 'good'
-sim_types:
-    param_tied_dir: True
-    full_dir: True
-    # can't run ind without param tied
-    ind_dir: True
 graphs:
     theta_val: True
-    gibbs_val: True
+    gibbs_val: False
     percent_correct: True
     confusion: True
-    moment_match: True
-    # data and pass_off only work with assist starting dist, no data is needed for uniform
+    moment_match: False
+    timing: True
+    precision_recall: True
+    # these only work with assist starting dist, no data is needed for uniform
     data: True
     pass_off: True
-    precision_recall: True
-    # sim_results_full: True
-    # sim_results_tied: True
-    # sim_results_ind: True
-    timing: True

@@ -313,68 +313,85 @@ class Graphing():
         #  fig1.savefig('figures/gibbs_validation_theta.png',bbox_inches='tight',pad_inches=0)
 
     def confusion(self,true_tar_tied,pred_tar_tied,pred_tar_full,pred_tar_ind,pred_tar_ml,pred_tar_ml_alone,real_obs,pred_obs):
-        fig,ax=plt.subplots(nrows=2,ncols=3,tight_layout=True)
+        #  fig,ax=plt.subplots(nrows=2,ncols=3,figsize=((15,10)),tight_layout=True)
+        fig=plt.figure(figsize=((15,10)),tight_layout=True)
         # Tied
+        plt.subplot(231)
         cm=confusion_matrix(true_tar_tied,pred_tar_tied)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[0,0].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[0,0].set_ylabel('True Label')
-        ax[0,0].set_xlabel('Given Label')
-        ax[0,0].set_title('Tied Sim')
+        plt.imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        plt.xticks(range(cm.shape[0]))
+        plt.yticks(range(cm.shape[1]))
+        plt.ylabel('True Label')
+        plt.xlabel('Given Label')
+        plt.title('Tied Sim')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[0,0].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # Full
+        plt.subplot(232)
         cm=confusion_matrix(true_tar_tied,pred_tar_full)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[0,1].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[0,1].set_ylabel('True Label')
-        ax[0,1].set_xlabel('Given Label')
-        ax[0,1].set_title('Full Sim')
+        plt.imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        plt.xticks(range(cm.shape[0]))
+        plt.yticks(range(cm.shape[1]))
+        plt.ylabel('True Label')
+        plt.xlabel('Given Label')
+        plt.title('Full Sim')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[0,1].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # Ind
+        plt.subplot(233)
         cm=confusion_matrix(true_tar_tied,pred_tar_ind)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[0,2].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[0,2].set_ylabel('True Label')
-        ax[0,2].set_xlabel('Given Label')
-        ax[0,2].set_title('Ind Sim')
+        plt.imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        plt.xticks(range(cm.shape[0]))
+        plt.yticks(range(cm.shape[1]))
+        plt.ylabel('True Label')
+        plt.xlabel('Given Label')
+        plt.title('Ind Sim')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[0,2].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # ML
+        plt.subplot(234)
         cm=confusion_matrix(true_tar_tied,pred_tar_ml)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[1,0].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[1,0].set_ylabel('True Label')
-        ax[1,0].set_xlabel('Given Label')
-        ax[1,0].set_title('HMM Sim')
+        plt.imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        plt.xticks(range(cm.shape[0]))
+        plt.yticks(range(cm.shape[1]))
+        plt.ylabel('True Label')
+        plt.xlabel('Given Label')
+        plt.title('HMM Sim')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[1,0].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # ML no pass
+        plt.subplot(235)
         cm=confusion_matrix(true_tar_tied,pred_tar_ml_alone)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[1,1].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[1,1].set_ylabel('True Label')
-        ax[1,1].set_xlabel('Given Label')
-        ax[1,1].set_title('HMM No Human Sim')
+        plt.imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        plt.xticks(range(cm.shape[0]))
+        plt.yticks(range(cm.shape[1]))
+        plt.ylabel('True Label')
+        plt.xlabel('Given Label')
+        plt.title('HMM No Human Sim')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[1,1].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         # human
+        plt.subplot(236)
         cm=confusion_matrix(real_obs,pred_obs)
         cm=cm.astype('float')/cm.sum(axis=1)[:,np.newaxis]
-        ax[1,2].imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
-        ax[1,2].set_ylabel('True Value')
-        ax[1,2].set_xlabel('Given Obs')
-        ax[1,2].set_xticks([0,1],['pos','neg'])
-        ax[1,2].set_yticks([0,1],['pos','neg'])
-        ax[1,2].set_title('Human Operator')
+        plt.imshow(cm,cmap='Blues',vmin=0.0,vmax=1.0)
+        plt.ylabel('True Value')
+        plt.xlabel('Given Obs')
+        plt.xticks([0,1],['pos','neg'])
+        plt.yticks([0,1],['pos','neg'])
+        plt.title('Human Operator')
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
-            ax[1,2].text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
+            plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
         fig.savefig('figures/confusion.png',bbox_inches='tight',pad_inches=0)
 
@@ -413,17 +430,19 @@ class Graphing():
         tied_match_std=np.std(tied_match_times)
         tied_avg_num=np.mean(tied_number)
 
-        fig1,ax=plt.subplots(nrows=1,ncols=2,tight_layout=True)
-        ax[0].bar(range(3),[ind_mean,tied_mean,full_mean],yerr=[ind_std,full_std,tied_std])
-        ax[0].set_xticks(range(3),('Ind','Tied','Full'))
-        ax[0].set_title('Average Time for Gibbs Sampling (5000 samples)')
-        ax[0].set_ylabel('Seconds')
+        fig1=plt.figure(figsize=((10,4)),tight_layout=True)
+        plt.subplot(121)
+        plt.bar(range(3),[ind_mean,tied_mean,full_mean],yerr=[ind_std,full_std,tied_std])
+        plt.xticks(range(3),('Ind','Tied','Full'))
+        plt.title('Average Time for Gibbs Sampling (5000 samples)')
+        plt.ylabel('Seconds')
 
-        ax[1].bar(range(3),[ind_match,tied_match,full_match],yerr=[ind_match_std,tied_match_std,
+        plt.subplot(122)
+        plt.bar(range(3),[ind_match,tied_match,full_match],yerr=[ind_match_std,tied_match_std,
             full_match_std],color='C1')
-        ax[1].set_xticks(range(3),('Ind','Tied','Full'))
-        ax[1].set_title('Average Time for Moment Matching')
-        ax[1].set_ylabel('Seconds')
+        plt.xticks(range(3),('Ind','Tied','Full'))
+        plt.title('Average Time for Moment Matching')
+        plt.ylabel('Seconds')
 
         fig2=plt.figure()
         for i in range(int(tied_avg_num)):
@@ -457,52 +476,56 @@ class Graphing():
     def precision_recall_graph(self,correct_tied,pred_percent_tied,correct_full,pred_percent_full,
             correct_ind,pred_percent_ind,correct_ml,pred_percent_ml,correct_ml_alone,
             pred_percent_ml_alone):
-        #TODO: maybe do this with subplots, not axes subplots
-        fig,ax=plt.subplots(nrows=2,ncols=3,tight_layout=True)
+        fig=plt.figure(figsize=((15,10)),tight_layout=True)
         # Tied
+        plt.subplot(231)
         precision, recall, _ =precision_recall_curve(correct_tied,pred_percent_tied)
-        ax[0,0].step(recall,precision,where='post')
-        ax[0,0].set_xlim([0.0,1.0])
-        ax[0,0].set_ylim([0.0,1.0])
-        ax[0,0].set_xlabel('Recall')
-        ax[0,0].set_ylabel('Precission')
-        ax[0,0].set_title('Tied Sim')
+        plt.step(recall,precision,where='post')
+        plt.xlim([0.0,1.0])
+        plt.ylim([0.0,1.0])
+        plt.xlabel('Recall')
+        plt.ylabel('Precission')
+        plt.title('Tied Sim')
 
         # Full
+        plt.subplot(232)
         precision, recall, _ =precision_recall_curve(correct_full,pred_percent_full)
-        ax[0,1].step(recall,precision,where='post')
-        ax[0,1].set_xlim([0.0,1.0])
-        ax[0,1].set_ylim([0.0,1.0])
-        ax[0,1].set_xlabel('Recall')
-        ax[0,1].set_ylabel('Precission')
-        ax[0,1].set_title('Full Sim')
+        plt.step(recall,precision,where='post')
+        plt.xlim([0.0,1.0])
+        plt.ylim([0.0,1.0])
+        plt.xlabel('Recall')
+        plt.ylabel('Precission')
+        plt.title('Full Sim')
 
         # Ind
+        plt.subplot(233)
         precision, recall, _ =precision_recall_curve(correct_ind,pred_percent_ind)
-        ax[0,2].step(recall,precision,where='post')
-        ax[0,2].set_xlim([0.0,1.0])
-        ax[0,2].set_ylim([0.0,1.0])
-        ax[0,2].set_xlabel('Recall')
-        ax[0,2].set_ylabel('Precission')
-        ax[0,2].set_title('Ind Sim')
+        plt.step(recall,precision,where='post')
+        plt.xlim([0.0,1.0])
+        plt.ylim([0.0,1.0])
+        plt.xlabel('Recall')
+        plt.ylabel('Precission')
+        plt.title('Ind Sim')
 
         # ML
+        plt.subplot(234)
         precision, recall, _ =precision_recall_curve(correct_ml,pred_percent_ml)
-        ax[1,0].step(recall,precision,where='post')
-        ax[1,0].set_xlim([0.0,1.0])
-        ax[1,0].set_ylim([0.0,1.0])
-        ax[1,0].set_xlabel('Recall')
-        ax[1,0].set_ylabel('Precission')
-        ax[1,0].set_title('HMM Sim')
+        plt.step(recall,precision,where='post')
+        plt.xlim([0.0,1.0])
+        plt.ylim([0.0,1.0])
+        plt.xlabel('Recall')
+        plt.ylabel('Precission')
+        plt.title('HMM Sim')
 
         # ML no pass
+        plt.subplot(235)
         precision, recall, _ =precision_recall_curve(correct_ml_alone,pred_percent_ml_alone)
-        ax[1,1].step(recall,precision,where='post')
-        ax[1,1].set_xlim([0.0,1.0])
-        ax[1,1].set_ylim([0.0,1.0])
-        ax[1,1].set_xlabel('Recall')
-        ax[1,1].set_ylabel('Precission')
-        ax[1,1].set_title('HMM No Human Sim')
+        plt.step(recall,precision,where='post')
+        plt.xlim([0.0,1.0])
+        plt.ylim([0.0,1.0])
+        plt.xlabel('Recall')
+        plt.ylabel('Precission')
+        plt.title('HMM No Human Sim')
 
         fig.savefig('figures/precision_recall.png',bbox_inches='tight',pad_inches=0)
 
