@@ -10,6 +10,7 @@ import os
 import itertools
 import warnings
 import time
+from tqdm import tqdm
 np.set_printoptions(precision=2)
 
 from data_sim.DynamicsProfiles import *
@@ -167,8 +168,6 @@ class Human():
         return obs
 
     def HumanAnswer2(self,num_tar,real_target,obs):
-        if len(obs)==0:
-            prob=self.theta1_correct[real_target,:]
         prev_obs=obs[-1]
         prob=self.theta2_correct[real_target*2*num_tar+prev_obs,:]
         return np.random.choice(range(2*num_tar),p=prob)
@@ -265,8 +264,8 @@ class DataFusion(Human):
                     theta2_static[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
 
             # begin gibbs sampling
-            theta2=copy.deepcopy(theta2_static)
-            theta1=copy.deepcopy(theta1_static)
+            theta2=copy.copy(theta2_static)
+            theta1=copy.copy(theta1_static)
             for n in range(num_samples):
                 # calc X as if we knew theta2
                 for i in self.names:
@@ -286,10 +285,10 @@ class DataFusion(Human):
                     all_post[int((n-burn_in)/5),:,:]=postX.values()
                 # sample from X
                 X=np.random.choice(range(num_tar),p=postX.values())
-                alphas1=copy.deepcopy(self.theta1_full)
-                alphas2=copy.deepcopy(self.theta2_full)
-                theta1=copy.deepcopy(theta1_static)
-                theta2=copy.deepcopy(theta2_static)
+                alphas1=copy.copy(self.theta1_full)
+                alphas2=copy.copy(self.theta2_full)
+                theta1=copy.copy(theta1_static)
+                theta2=copy.copy(theta2_static)
                 # clac theta1 as if we knew X
                 alphas1[X,obs[0]]+=1
                 theta1[X,:]=np.random.dirichlet(alphas1[X,:])
@@ -386,8 +385,8 @@ class DataFusion(Human):
                 theta2_static[i,:]=scipy.stats.dirichlet.mean(alpha=self.theta2[i,:])
 
             # begin gibbs sampling
-            theta1=copy.deepcopy(theta1_static)
-            theta2=copy.deepcopy(theta2_static)
+            theta1=copy.copy(theta1_static)
+            theta2=copy.copy(theta2_static)
             for n in range(num_samples):
                 # calc X as if we knew theta2
                 for i in self.names:
@@ -417,10 +416,10 @@ class DataFusion(Human):
                     all_post[int((n-burn_in)/5),:,:]=postX.values()
                 # sample from X
                 X=np.random.choice(range(num_tar),p=postX.values())
-                alphas1=copy.deepcopy(self.theta1)
-                alphas2=copy.deepcopy(self.theta2)
-                theta1=copy.deepcopy(theta1_static)
-                theta2=copy.deepcopy(theta2_static)
+                alphas1=copy.copy(self.theta1)
+                alphas2=copy.copy(self.theta2)
+                theta1=copy.copy(theta1_static)
+                theta2=copy.copy(theta2_static)
                 # calc theta1 as i we knew it
                 alphas1[self.select_param(X,obs[0])]+=1
                 theta1=np.random.dirichlet(alphas1)
@@ -537,7 +536,7 @@ class DataFusion(Human):
             theta1_static[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_ind[X,:])
 
         # begin gibbs sampling
-        theta1=copy.deepcopy(theta1_static)
+        theta1=copy.copy(theta1_static)
         for n in range(num_samples):
             # calc X as if we knew theta2
             for i in self.names:
@@ -556,8 +555,8 @@ class DataFusion(Human):
                 all_post[int((n-burn_in)/5),:,:]=postX.values()
             # sample from X
             X=np.random.choice(range(num_tar),p=postX.values())
-            alphas1=copy.deepcopy(self.theta1_ind)
-            theta1=copy.deepcopy(theta1_static)
+            alphas1=copy.copy(self.theta1_ind)
+            theta1=copy.copy(theta1_static)
             # clac theta1 as if we knew X
             for i in range(len(obs)):
                 alphas1[X,obs[i]]+=1
@@ -685,12 +684,12 @@ class DataFusion(Human):
         R_bot=np.zeros(num_tar)
         #  print self.confidence
         for X in range(num_tar):
+            # HMM sample
+            classification=np.random.choice(range(num_tar),size=num_samples,p=self.confidence[X])
             for n in range(num_samples):
-                # HMM sample
-                classification=np.random.choice(range(num_tar),p=self.confidence[X])
                 # human sample
                 obs=[]
-                post_sample=copy.deepcopy(post)
+                post_sample=copy.copy(post)
                 while max(post_sample.values())<threshold:
                     if len(obs)==0:
                         obs=self.HumanObservations(num_tar,X,obs)
@@ -710,7 +709,7 @@ class DataFusion(Human):
                     R_human[X]+=right
                 else:
                     R_human[X]+=wrong
-                if classification==X:
+                if classification[n]==X:
                     R_bot[X]+=right
                 else:
                     R_bot[X]+=wrong
@@ -727,6 +726,12 @@ class DataFusion(Human):
 
              
 if __name__ == '__main__':
-    a=Human()
-    a.DirPrior(5)
-    print a.HumanAnswer2(5,2,[0,4])
+    num_tar=10
+    a=DataFusion(num_tar)
+    a.DirPrior(num_tar)
+    #  print a.HumanAnswer2(5,2,[0,4])
+    a.probs={}
+    for i in a.names:
+        a.probs[i]=1/num_tar
+    for i in tqdm(range(100),ncols=100):
+        a.VOI2(num_tar,0.9,a.probs)
