@@ -112,6 +112,11 @@ if __name__ == '__main__':
     # gibbs validations
     theta2_samples=[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
 
+    if num_tar==5:
+        pass_off_targets=[[],[],[],[],[]]
+    elif num_tar==10:
+        pass_off_targets=[[],[],[],[],[],[],[],[],[],[]]
+
     # start sim
     full_sim=DataFusion(num_tar)
     full_sim.DirPrior(num_tar,human_type)
@@ -147,6 +152,7 @@ if __name__ == '__main__':
             #  print param_tied_sim.frame
             pass_off_tracker[n]=param_tied_sim.frame
             pass_off_average.append(np.mean(pass_off_tracker))
+            pass_off_targets[genus].append(param_tied_sim.frame)
             full_sim.probs=copy.copy(param_tied_sim.probs)
             ind_sim.probs=copy.copy(param_tied_sim.probs)
             chosen=np.argmax(param_tied_sim.probs.values())
@@ -327,6 +333,7 @@ if __name__ == '__main__':
         graph_dic['pred_tar_full']=None
         graph_dic['pred_tar_ind']=None
         graph_dic['pred_tar_ml']=None
+        graph_dic['pred_tar_ml_alone']=None
         graph_dic['real_obs']=None
         graph_dic['pred_obs']=None
 
@@ -336,8 +343,10 @@ if __name__ == '__main__':
         graph_dic['data']=None
 
     if graph_params['pass_off']:
-        graph_dic['pass_off']=pass_off_average
+        graph_dic['pass_off_average']=pass_off_average
+        graph_dic['pass_off']=pass_off_tracker
     else:
+        graph_dic['pass_off_average']=None
         graph_dic['pass_off']=None
 
     if graph_params['timing']:
@@ -387,5 +396,8 @@ if __name__ == '__main__':
     print "Ind percent,num:",correct_percent_ind[-1],np.mean(ind_number)
     print "Tied percent,num:",correct_percent_tied[-1],np.mean(tied_number)
     print "Full percent,num:",correct_percent_full[-1],np.mean(full_number)
+    print "Human Percent of correct observations:",sum(param_tied_sim.human_correct)/len(param_tied_sim.human_correct)
+    for i in range(num_tar):
+        print "Avg pass off frame target ",i,":",np.mean(pass_off_targets[i])
     Graphing(graph_dic)
     plt.show()

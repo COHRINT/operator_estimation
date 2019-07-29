@@ -31,6 +31,7 @@ class Human():
         #init for confusion matrix
         self.pred_obs=[]
         self.real_obs=[]
+        self.human_correct=[]
 
         #theta 1
         self.table=[5,2,0.5,8]
@@ -73,31 +74,43 @@ class Human():
         table_real=np.zeros((num_tar,2*num_tar,2*num_tar))
         base_table_real=np.ones((num_tar,2*num_tar))
         base_table_real*=5
+        human_rates=np.array([[10,0.4,1.67,0.4],[9,0.7,2,0.9],[8,1,2.7,1.3],[7,1.2,3.4,1.7],[6,1.3,4,2.1],[5,1.5,5,2.5])
         for i in range(5):
-            if human=='good':
-                #tp
-                base_table_real[i,2*i]*=10
-                for j in range(5):
-                    if i==j:
-                        #fn
-                        base_table_real[i,2*j+1]*=0.4
-                    else:
-                        #tn
-                        base_table_real[i,2*j+1]*=1.67
-                        #fp
-                        base_table_real[i,2*j]*=0.4
-            elif human=='bad':
-                #tp
-                base_table_real[i,2*i]*=5
-                for j in range(5):
-                    if i==j:
-                        #fn
-                        base_table_real[i,2*j+1]*=1.5
-                    else:
-                        #tn
-                        base_table_real[i,2*j+1]*=5
-                        #fp
-                        base_table_real[i,2*j]*=2.5
+            #tp
+            base_table_real[i,2*i]*=human_rates[human][0]
+            for j in range(5):
+                if i==j:
+                    #fn
+                    base_table_real[i,2*j+1]*=human_rates[human][1]
+                else:
+                    #tn
+                    base_table_real[i,2*j+1]*=human_rates[human][2]
+                    #fp
+                    base_table_real[i,2*j]*=human_rates[human][3]
+            #  if human=='good':
+            #      #tp
+            #      base_table_real[i,2*i]*=10
+            #      for j in range(5):
+            #          if i==j:
+            #              #fn
+            #              base_table_real[i,2*j+1]*=0.4
+            #          else:
+            #              #tn
+            #              base_table_real[i,2*j+1]*=1.67
+            #              #fp
+            #              base_table_real[i,2*j]*=0.4
+            #  elif human=='bad':
+            #      #tp
+            #      base_table_real[i,2*i]*=5
+            #      for j in range(5):
+            #          if i==j:
+            #              #fn
+            #              base_table_real[i,2*j+1]*=1.5
+            #          else:
+            #              #tn
+            #              base_table_real[i,2*j+1]*=5
+            #              #fp
+            #              base_table_real[i,2*j]*=2.5
         for i in range(2*num_tar):
             table_real[:,:,i]=base_table_real
         for i in range(2*num_tar):
@@ -113,7 +126,7 @@ class Human():
                 self.theta2_correct[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=table_real[X,prev_obs,:])
                 #  self.table_compare[X*2*num_tar+prev_obs,:]=table_real[X,prev_obs,:]
 
-    def HumanObservations(self,num_tar,real_target,obs):
+    def HumanObservations(self,num_tar,real_target,obs,real=True):
         if len(obs)>0:
             prev_obs=obs[-1]
             obs.append(np.random.choice(range(2*num_tar),p=self.theta2_correct[real_target*2*num_tar+prev_obs,:]))
@@ -146,18 +159,23 @@ class Human():
                     obs.append(np.random.choice(choices))
 
         # confusion matrix for human
-        if obs[-1]%2==0:
-            self.pred_obs.append(0)
-            if (obs[-1]/2)==real_target:
-                self.real_obs.append(0)
+        if real:
+            if obs[-1]%2==0:
+                self.pred_obs.append(0)
+                if (obs[-1]/2)==real_target:
+                    self.real_obs.append(0)
+                    self.human_correct.append(1)
+                else:
+                    self.real_obs.append(1)
+                    self.human_correct.append(0)
             else:
-                self.real_obs.append(1)
-        else:
-            self.pred_obs.append(1)
-            if (int(obs[-1]/2))==real_target:
-                self.real_obs.append(0)
-            else:
-                self.real_obs.append(1)
+                self.pred_obs.append(1)
+                if (int(obs[-1]/2))==real_target:
+                    self.real_obs.append(0)
+                    self.human_correct.append(0)
+                else:
+                    self.real_obs.append(1)
+                    self.human_correct.append(1)
 
         return obs
 
@@ -692,7 +710,7 @@ class DataFusion(Human):
                 post_sample=copy.copy(post)
                 while max(post_sample.values())<threshold:
                     if len(obs)==0:
-                        obs=self.HumanObservations(num_tar,X,obs)
+                        obs=self.HumanObservations(num_tar,X,obs,real=False)
                     else:
                         obs.append(self.HumanAnswer2(num_tar,X,obs))
                     for i in self.names:

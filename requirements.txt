@@ -1,0 +1,7 @@
+numpy
+scipy
+PyYAML
+tqdm
+matplotlib
+hmmlearn
+sklearn

@@ -74,7 +74,8 @@ class Graphing():
         # data
         data_dic=graph_dic['data']
         # pass off
-        pass_off_average=graph_dic['pass_off']
+        pass_off_average=graph_dic['pass_off_average']
+        pass_off=graph_dic['pass_off']
 
        
         if (theta2_correct is not None) and (alphas_start is not None) and (theta2 is not None):
@@ -120,9 +121,9 @@ class Graphing():
             print "Making Data Graph"
             self.data_graph(num_tar,data_dic)
 
-        if pass_off_average is not None:
+        if (pass_off_average is not None) and (pass_off is not None):
             print "Making Pass Off Graph"
-            self.pass_off_graph(num_events,pass_off_average)
+            self.pass_off_graph(num_events,pass_off_average,pass_off)
         #  print "Making Theta2 Validation GIF"
         #  self.human_validation()
         #  print "Making Convergence GIF"
@@ -545,9 +546,10 @@ class Graphing():
 
         fig.savefig('figures/data.png',bbox_inches='tight',pad_inches=0)
 
-    def pass_off_graph(self,num_events,pass_off_average):
+    def pass_off_graph(self,num_events,pass_off_average,pass_off):
         fig=plt.figure()
         plt.plot([n+5 for n in range(num_events-5)],pass_off_average[5:])
+        plt.scatter(range(len(pass_off)-5),pass_off[5:])
         plt.xlabel('Number of Targets')
         plt.ylabel('Average Pass Off Frame')
         plt.title('Average Pass Off Frame Over Time')
