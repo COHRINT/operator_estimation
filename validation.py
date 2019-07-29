@@ -74,7 +74,7 @@ class Human():
         table_real=np.zeros((num_tar,2*num_tar,2*num_tar))
         base_table_real=np.ones((num_tar,2*num_tar))
         base_table_real*=5
-        human_rates=np.array([[10,0.4,1.67,0.4],[9,0.7,2,0.9],[8,1,2.7,1.3],[7,1.2,3.4,1.7],[6,1.3,4,2.1],[5,1.5,5,2.5])
+        human_rates=np.array([[10,0.4,1.67,0.4],[9,0.7,2,0.9],[8,1,2.7,1.3],[7,1.2,3.4,1.7],[6,1.3,4,2.1],[5,1.5,5,2.5]])
         for i in range(5):
             #tp
             base_table_real[i,2*i]*=human_rates[human][0]
