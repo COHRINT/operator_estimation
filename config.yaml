@@ -1,7 +1,8 @@
 starting_dist: 'assist' #uniform or assist
 num_tar: 5
 threshold: 0.9
-human: 'good'
+# human: 'good'
+human: 0
 graphs:
     theta_val: True
     gibbs_val: False

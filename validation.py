@@ -179,16 +179,20 @@ class Human():
 
         return obs
 
-    def HumanAnswer(self,num_tar,tar_asked,real_target,obs):
-        prev_obs=obs[-1]
-        prob=self.theta2_correct[real_target*2*num_tar+prev_obs,2*tar_asked:2*tar_asked+2]
-        obs.append(np.random.choice([2*tar_asked,2*tar_asked+1],p=prob/sum(prob)))
+    def HumanAnswer(self,num_tar,real_target,obs,theta1,theta2):
+        if len(obs)==0:
+            prob=theta1[real_target,:]
+            obs=[np.random.choice(range(2*num_tar),p=prob)]
+        else:
+            prev_obs=obs[-1]
+            prob=theta2[real_target*2*num_tar+prev_obs,:]
+            obs.append(np.random.choice(range(2*num_tar),p=prob))
         return obs
 
-    def HumanAnswer2(self,num_tar,real_target,obs):
-        prev_obs=obs[-1]
-        prob=self.theta2_correct[real_target*2*num_tar+prev_obs,:]
-        return np.random.choice(range(2*num_tar),p=prob)
+    #  def HumanAnswer2(self,num_tar,real_target,obs,theta2):
+    #      prev_obs=obs[-1]
+    #      prob=self.theta2[real_target*2*num_tar+prev_obs,:]
+    #      return np.random.choice(range(2*num_tar),p=prob)
         #  return obs
 
 class DataFusion(Human):
@@ -710,9 +714,9 @@ class DataFusion(Human):
                 post_sample=copy.copy(post)
                 while max(post_sample.values())<threshold:
                     if len(obs)==0:
-                        obs=self.HumanObservations(num_tar,X,obs,real=False)
+                        obs=self.HumanAnswer(num_tar,X,obs,theta1,theta2)
                     else:
-                        obs.append(self.HumanAnswer2(num_tar,X,obs))
+                        obs=self.HumanAnswer(num_tar,X,obs,theta1,theta2)
                     for i in self.names:
                         if len(obs)==1:
                             post_sample[i]*=theta1[self.names.index(i),obs[0]]

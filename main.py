@@ -151,7 +151,7 @@ if __name__ == '__main__':
                 pass_off=param_tied_sim.VOI2(num_tar,threshold,param_tied_sim.probs)
             #  print param_tied_sim.frame
             pass_off_tracker[n]=param_tied_sim.frame
-            pass_off_average.append(np.mean(pass_off_tracker))
+            pass_off_average.append(np.mean(pass_off_tracker[:n+1]))
             pass_off_targets[genus].append(param_tied_sim.frame)
             full_sim.probs=copy.copy(param_tied_sim.probs)
             ind_sim.probs=copy.copy(param_tied_sim.probs)
@@ -400,4 +400,4 @@ if __name__ == '__main__':
     for i in range(num_tar):
         print "Avg pass off frame target ",i,":",np.mean(pass_off_targets[i])
     Graphing(graph_dic)
-    plt.show()
+    #  plt.show()
