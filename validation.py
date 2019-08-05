@@ -741,7 +741,7 @@ class DataFusion(Human):
         VOI=(sum(R_human*post.values())/num_samples)-(sum(R_bot*post.values())/num_samples)
         #  print VOI
         #  sys.exit()
-        if VOI>.5:
+        if VOI>.45:
             return 1
         else:
             return 0

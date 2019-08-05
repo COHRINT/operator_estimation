@@ -11,6 +11,8 @@ import copy
 import sys
 import os
 import itertools
+import yaml
+import cPickle as pickle
 import warnings
 import time
 from tqdm import tqdm
@@ -18,6 +20,16 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_recall_curve
 np.set_printoptions(precision=2)
 
+def load_config(path=None):
+    if not path:
+        path=os.path.dirname(__file__) + 'config.yaml'
+    try:
+        with open(path, 'r') as stream:
+            cfg=yaml.load(stream)
+    except IOError:
+        print "No config file found"
+        raise
+    return cfg
 
 class Graphing():
     def __init__(self,graph_dic):
@@ -549,7 +561,7 @@ class Graphing():
     def pass_off_graph(self,num_events,pass_off_average,pass_off):
         fig=plt.figure()
         plt.plot([n+5 for n in range(num_events-5)],pass_off_average[5:])
-        plt.scatter(range(len(pass_off)-5),pass_off[5:])
+        plt.scatter(range(len(pass_off)),pass_off)
         plt.xlabel('Number of Targets')
         plt.ylabel('Average Pass Off Frame')
         plt.title('Average Pass Off Frame Over Time')
@@ -797,3 +809,107 @@ class Graphing():
                 index2=select_index(int(i/(2*num_tar)),j%(2*num_tar))
                 theta2[i,j]=alphas[index1,index2]
         return theta2
+
+
+if __name__ == '__main__':
+    cfg=load_config('config.yaml')
+    num_sims=cfg['num_sims']
+    num_tar=cfg['num_tar']
+    graph_params=cfg['graphs']
+    graph_dic=pickle.load(open('graphing_data0.p','rb'))
+    for j in range(1,num_sims):
+        filename='graphing_data'+str(i)+'.p'
+        new_dic=pickle.load(open(filename,'rb'))
+
+        if graph_params['percent_correct']:
+            graph_dic['correct_percent_tied'].append(new_dic['correct_percent_tied'])
+            graph_dic['correct_percent_full'].append(new_dic['correct_percent_full'])
+            graph_dic['correct_percent_ind'].append(new_dic['correct_percent_ind'])
+            graph_dic['correct_percent_ml'].append(new_dic['correct_percent_ml'])
+            graph_dic['correct_percent_ml_alone'].append(new_dic['correct_percent_ml_alone'])
+            #TODO: need to change graph fcn
+
+        if graph_params['precision_recall']:
+            graph_dic['pred_percent_tied'].extend(new_dic['pred_percent_tied'])
+            graph_dic['correct_tied'].extend(new_dic['correct_tied'])
+            graph_dic['pred_percent_full'].extend(new_dic['pred_percent_full'])
+            graph_dic['correct_full'].extend(new_dic['correct_full'])
+            graph_dic['pred_percent_ind'].extend(new_dic['pred_percent_ind'])
+            graph_dic['correct_ind'].extend(new_dic['correct_ind'])
+            graph_dic['pred_percent_ml'].extend(new_dic['pred_percent_ml'])
+            graph_dic['correct_ml'].extend(new_dic['correct_ml'])
+            graph_dic['pred_percent_ml_alone'].extend(new_dic['pred_percent_ml_alone'])
+            graph_dic['correct_ml_alone'].extend(new_dic['correct_ml_alone'])
+
+        if graph_params['confusion']:
+            graph_dic['true_tar_tied'].extend(new_dic['true_tar_tied'])
+            graph_dic['pred_tar_tied'].extend(new_dic['pred_tar_tied'])
+            graph_dic['pred_tar_full'].extend(new_dic['pred_tar_full'])
+            graph_dic['pred_tar_ind'].extend(new_dic['pred_tar_ind'])
+            graph_dic['pred_tar_ml'].extend(new_dic['pred_tar_ml'])
+            graph_dic['pred_tar_ml_alone'].extend(new_dic['pred_tar_ml_alone'])
+            graph_dic['real_obs'].extend(new_dic['real_obs'])
+            graph_dic['pred_obs'].extend(new_dic['pred_obs'])
+
+        if graph_params['data']:
+            for i in range(num_tar):
+                graph_dic['data'][i].append(new_dic['data'][i])
+
+        #pass off, stack and get averages and std
+        if graph_params['pass_off']:
+            graph_dic['pass_off_average'].append(new_dic['pass_off_average'])
+            #TODO: need to change graph fcn
+
+        if graph_params['timing']:
+            graph_dic['tied_times'].extend(new_dic['tied_times'])
+            graph_dic['tied_number'].extend(new_dic['tied_number'])
+            graph_dic['tied_match_times'].extend(new_dic['tied_match_times'])
+            graph_dic['full_times'].extend(new_dic['full_times'])
+            graph_dic['full_number'].extend(new_dic['full_number'])
+            graph_dic['full_match_times'].extend(new_dic['full_match_times'])
+            graph_dic['ind_times'].extend(new_dic['ind_times'])
+            graph_dic['ind_number'].extend(new_dic['ind_number'])
+            graph_dic['ind_match_times'].extend(new_dic['ind_match_times'])
+
+        #theta val, stack and take averages
+        if graph_params['theta_val']:
+            graph_dic['theta1'].append(new_dic['theta1'])
+            #array
+            if j==1:
+                graph_dic['theta1_correct']=np.append(graph_dic['theta1_correct'][:,np.newaxis], \
+                        new_dic['theta1_correct'][:,np.newaxis],axis=1)
+                graph_dic['theta2']=np.append(graph_dic['theta2'][:,:,np.newaxis], \
+                        new_dic['theta2'][:,:,np.newaxis],axis=2)
+                graph_dic['theta2_correct']=np.append(graph_dic['theta2_correct'][:,:,np.newaxis], \
+                        new_dic['theta2_correct'][:,:,np.newaxis],axis=2)
+            else:
+                graph_dic['theta1_correct']=np.append(graph_dic['theta1_correct'], \
+                        new_dic['theta1_correct'][:,np.newaxis],axis=1)
+                graph_dic['theta2']=np.append(graph_dic['theta2'], \
+                        new_dic['theta2'][:,:,np.newaxis],axis=2)
+                graph_dic['theta2_correct']=np.append(graph_dic['theta2_correct'], \
+                        new_dic['theta2_correct'][:,:,np.newaxis],axis=2)
+
+            #  graph_dic['alphas_start'].append(new_dic['alphas_start'])
+            #  graph_dic['alphas1_start'].append(new_dic['alphas1_start'])
+
+        #avg pass off, take avg and std
+        for i in range(num_tar):
+            graph_dic['avg_pass_off'+str(i)].extend(new_dic['avg_pass_off'+str(i)])
+
+        #human correct, append and and take avg
+        graph_dic['human_correct_overall'].extend(new_dic['human_correct_overall'])
+
+    
+    graph_dic['theta1']=np.mean(graph_dic['theta1'],axis=0)
+    graph_dic['theta1_correct']=np.mean(graph_dic['theta1_correct'],axis=1)
+    graph_dic['theta2']=np.mean(graph_dic['theta2'],axis=2)
+    graph_dic['theta2_correct']=np.mean(graph_dic['theta2_correct'],axis=2)
+
+    Graphing(graph_dic)
+    print 'Human Percent of Correct Observations:',sum(graph_dic['human_correct_overall'])/len(graph_dic['human_correct_overall'])
+    for i in range(num_tar):
+        print "Avg, std pass off frame target ",i,":",np.mean(graph_dic['avg_pass_off'+str(i)]), \
+                np.std(graph_dic['avg_pass_off'+str(i)])
+
+
