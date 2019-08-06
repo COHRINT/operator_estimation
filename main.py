@@ -55,6 +55,7 @@ if __name__ == '__main__':
     num_tar=cfg['num_tar']
     threshold=cfg['threshold']
     human_type=cfg['human']
+    tar_seq=np.load(str(num_tar)+'_tar.npy')
 
     for sim_num in range(num_sims):
         #data
@@ -133,7 +134,8 @@ if __name__ == '__main__':
         #running sim
         for n in tqdm(range(num_events),ncols=100):
             # initialize target type
-            genus=np.random.randint(num_tar)
+            #  genus=np.random.randint(num_tar)
+            genus=tar_seq[sim_num,n]
             #  genus=3
             # getting a prior from ML
             if cfg['starting_dist']=='assist':
@@ -400,7 +402,7 @@ if __name__ == '__main__':
 
         graph_dic['human_correct_overall']=param_tied_sim.human_correct
 
-        filename='graphing_data'+str(sim_num)+'.p'
+        filename='figures/graphing_data/graphing_data'+str(sim_num)+'.p'
         pickle.dump(graph_dic,open(filename,'wb'))
 
 
