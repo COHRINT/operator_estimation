@@ -43,6 +43,10 @@ class Graphing():
         correct_percent_ind=graph_dic['correct_percent_ind']
         correct_percent_ml=graph_dic['correct_percent_ml']
         correct_percent_ml_alone=graph_dic['correct_percent_ml_alone']
+        if graph_dic.has_key('multiple'):
+            multiple=True
+        else:
+            multiple=False
         # precision recall
         pred_percent_tied=graph_dic['pred_percent_tied']
         pred_percent_full=graph_dic['pred_percent_full']
@@ -127,7 +131,7 @@ class Graphing():
                 and (correct_percent_full is not None) and (correct_percent_ind is not None):
             print "Making Percent Correct Plot"
             self.percent_correct(num_events,correct_percent_tied,correct_percent_ml,
-                    correct_percent_full,correct_percent_ind,correct_percent_ml_alone)
+                    correct_percent_full,correct_percent_ind,correct_percent_ml_alone,multiple)
         
         if data_dic is not None:
             print "Making Data Graph"
@@ -407,14 +411,37 @@ class Graphing():
 
         fig.savefig('figures/confusion.png',bbox_inches='tight',pad_inches=0)
 
-    def percent_correct(self,num_events,correct_percent,correct_percent_ml,correct_percent_full,correct_percent_ind,correct_percent_ml_alone):
+    def percent_correct(self,num_events,correct_percent,correct_percent_ml,correct_percent_full,correct_percent_ind,correct_percent_ml_alone,multiple=False):
         fig=plt.figure()
-        plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
-        plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
-        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind[5:], label="w/Human Total Correct (Ind)")
-        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml[5:], label="Before Human Total Correct")
-        plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml_alone[5:], label="No Human Total Correct")
-        plt.legend()
+        if multiple:
+            correct_percent_mean=np.mean(correct_percent,axis=0)
+            correct_percent_std=np.std(correct_percent,axis=0)
+            correct_percent_full_mean=np.mean(correct_percent_full,axis=0)
+            correct_percent_full_std=np.std(correct_percent_full,axis=0)
+            correct_percent_ind_mean=np.mean(correct_percent_ind,axis=0)
+            correct_percent_ind_std=np.std(correct_percent_ind,axis=0)
+            correct_percent_ml_mean=np.mean(correct_percent_ml,axis=0)
+            correct_percent_ml_std=np.std(correct_percent_ml,axis=0)
+            correct_percent_ml_alone_mean=np.mean(correct_percent_ml_alone,axis=0)
+            correct_percent_ml_alone_std=np.std(correct_percent_ml_alone,axis=0)
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_mean[5:], label="w/Human Total Correct (Tied)",linewidth=4)
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_mean[5:]+correct_percent_std[5:],correct_percent_mean[5:]-correct_percent_std[5:],alpha=0.5)
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_full_mean[5:], label="w/Human Total Correct (Full)")
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_full_mean[5:]+correct_percent_full_std[5:],correct_percent_full_mean[5:]-correct_percent_full_std[5:],alpha=0.5)
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind_mean[5:], label="w/Human Total Correct (Ind)")
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_ind_mean[5:]+correct_percent_ind_std[5:],correct_percent_ind_mean[5:]-correct_percent_ind_std[5:],alpha=0.5)
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml_mean[5:], label="Before Human Total Correct")
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_ml_mean[5:]+correct_percent_ml_std[5:],correct_percent_ml_mean[5:]-correct_percent_ml_std[5:],alpha=0.5)
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml_alone_mean[5:], label="No Human Total Correct")
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_ml_alone_mean[5:]+correct_percent_ml_alone_std[5:],correct_percent_ml_alone_mean[5:]-correct_percent_ml_alone_std[5:],alpha=0.5)
+            plt.legend()
+        else:
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_full[5:], label="w/Human Total Correct (Full)")
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind[5:], label="w/Human Total Correct (Ind)")
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml[5:], label="Before Human Total Correct")
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml_alone[5:], label="No Human Total Correct")
+            plt.legend()
         plt.xlabel('Number of Targets')
         plt.ylabel('Percent Correct')
         plt.ylim(0,1.1)
@@ -558,12 +585,19 @@ class Graphing():
 
         fig.savefig('figures/data.png',bbox_inches='tight',pad_inches=0)
 
-    def pass_off_graph(self,num_events,pass_off_average,pass_off):
+    def pass_off_graph(self,num_events,pass_off_average,pass_off,multiple=False):
         fig=plt.figure()
-        plt.plot([n+5 for n in range(num_events-5)],pass_off_average[5:])
-        plt.scatter(range(len(pass_off)),pass_off)
+        if multiple:
+            pass_off_mean=np.mean(pass_off_average,axis=0)
+            pass_off_std=np.std(pass_off_average,axis=0)
+            plt.plot([n+5 for n in range(num_events-5)],pass_off_mean[5:])
+            plt.fill_between([n+5 for n in range(num_events-5)],pass_off_mean[5:]+pass_off_std[5:],pass_off_mean[5:]-pass_off_std[5:],alpha=0.5)
+        else:
+            plt.plot([n+5 for n in range(num_events-5)],pass_off_average[5:])
+            plt.scatter(range(len(pass_off)),pass_off)
         plt.xlabel('Number of Targets')
         plt.ylabel('Average Pass Off Frame')
+        plt.ylim(-5,105)
         plt.title('Average Pass Off Frame Over Time')
 
         fig.savefig('figures/pass_off.png',bbox_inches='tight',pad_inches=0)
@@ -827,7 +861,7 @@ if __name__ == '__main__':
             graph_dic['correct_percent_ind'].append(new_dic['correct_percent_ind'])
             graph_dic['correct_percent_ml'].append(new_dic['correct_percent_ml'])
             graph_dic['correct_percent_ml_alone'].append(new_dic['correct_percent_ml_alone'])
-            #TODO: need to change graph fcn
+            graph_dic['multiple']=True
 
         if graph_params['precision_recall']:
             graph_dic['pred_percent_tied'].extend(new_dic['pred_percent_tied'])
@@ -858,7 +892,7 @@ if __name__ == '__main__':
         #pass off, stack and get averages and std
         if graph_params['pass_off']:
             graph_dic['pass_off_average'].append(new_dic['pass_off_average'])
-            #TODO: need to change graph fcn
+            graph_dic['multiple']=True
 
         if graph_params['timing']:
             graph_dic['tied_times'].extend(new_dic['tied_times'])
