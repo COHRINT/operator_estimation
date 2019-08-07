@@ -139,7 +139,7 @@ class Graphing():
 
         if (pass_off_average is not None) and (pass_off is not None):
             print "Making Pass Off Graph"
-            self.pass_off_graph(num_events,pass_off_average,pass_off)
+            self.pass_off_graph(num_events,pass_off_average,pass_off,multiple)
         #  print "Making Theta2 Validation GIF"
         #  self.human_validation()
         #  print "Making Convergence GIF"
@@ -850,9 +850,17 @@ if __name__ == '__main__':
     num_sims=cfg['num_sims']
     num_tar=cfg['num_tar']
     graph_params=cfg['graphs']
-    graph_dic=pickle.load(open('graphing_data0.p','rb'))
+    graph_dic=pickle.load(open('figures/graphing_data/graphing_data0.p','rb'))
+    if num_sims>1:
+        graph_dic['correct_percent_tied']=[graph_dic['correct_percent_tied']]
+        graph_dic['correct_percent_full']=[graph_dic['correct_percent_full']]
+        graph_dic['correct_percent_ind']=[graph_dic['correct_percent_ind']]
+        graph_dic['correct_percent_ml']=[graph_dic['correct_percent_ml']]
+        graph_dic['correct_percent_ml_alone']=[graph_dic['correct_percent_ml_alone']]
+        graph_dic['pass_off_average']=[graph_dic['pass_off_average']]
+        graph_dic['theta1']=[graph_dic['theta1']]
     for j in range(1,num_sims):
-        filename='graphing_data'+str(i)+'.p'
+        filename='figures/graphing_data/graphing_data'+str(j)+'.p'
         new_dic=pickle.load(open(filename,'rb'))
 
         if graph_params['percent_correct']:
@@ -887,7 +895,7 @@ if __name__ == '__main__':
 
         if graph_params['data']:
             for i in range(num_tar):
-                graph_dic['data'][i].append(new_dic['data'][i])
+                graph_dic['data'][i].extend(new_dic['data'][i])
 
         #pass off, stack and get averages and std
         if graph_params['pass_off']:
@@ -929,7 +937,7 @@ if __name__ == '__main__':
 
         #avg pass off, take avg and std
         for i in range(num_tar):
-            graph_dic['avg_pass_off'+str(i)].extend(new_dic['avg_pass_off'+str(i)])
+            graph_dic['avg_pass_off_'+str(i)].extend(new_dic['avg_pass_off_'+str(i)])
 
         #human correct, append and and take avg
         graph_dic['human_correct_overall'].extend(new_dic['human_correct_overall'])
@@ -943,7 +951,8 @@ if __name__ == '__main__':
     Graphing(graph_dic)
     print 'Human Percent of Correct Observations:',sum(graph_dic['human_correct_overall'])/len(graph_dic['human_correct_overall'])
     for i in range(num_tar):
-        print "Avg, std pass off frame target ",i,":",np.mean(graph_dic['avg_pass_off'+str(i)]), \
-                np.std(graph_dic['avg_pass_off'+str(i)])
+        print "Avg, std pass off frame target ",i,":",round(np.mean(graph_dic['avg_pass_off_'+str(i)]),2), \
+                round(np.std(graph_dic['avg_pass_off_'+str(i)]),2)
+    plt.show()
 
 
