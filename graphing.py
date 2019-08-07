@@ -897,7 +897,6 @@ if __name__ == '__main__':
             for i in range(num_tar):
                 graph_dic['data'][i].extend(new_dic['data'][i])
 
-        #pass off, stack and get averages and std
         if graph_params['pass_off']:
             graph_dic['pass_off_average'].append(new_dic['pass_off_average'])
             graph_dic['multiple']=True
@@ -913,10 +912,8 @@ if __name__ == '__main__':
             graph_dic['ind_number'].extend(new_dic['ind_number'])
             graph_dic['ind_match_times'].extend(new_dic['ind_match_times'])
 
-        #theta val, stack and take averages
         if graph_params['theta_val']:
             graph_dic['theta1'].append(new_dic['theta1'])
-            #array
             if j==1:
                 graph_dic['theta1_correct']=np.append(graph_dic['theta1_correct'][:,np.newaxis], \
                         new_dic['theta1_correct'][:,np.newaxis],axis=1)
@@ -932,14 +929,9 @@ if __name__ == '__main__':
                 graph_dic['theta2_correct']=np.append(graph_dic['theta2_correct'], \
                         new_dic['theta2_correct'][:,:,np.newaxis],axis=2)
 
-            #  graph_dic['alphas_start'].append(new_dic['alphas_start'])
-            #  graph_dic['alphas1_start'].append(new_dic['alphas1_start'])
-
-        #avg pass off, take avg and std
         for i in range(num_tar):
             graph_dic['avg_pass_off_'+str(i)].extend(new_dic['avg_pass_off_'+str(i)])
 
-        #human correct, append and and take avg
         graph_dic['human_correct_overall'].extend(new_dic['human_correct_overall'])
 
     
@@ -954,5 +946,3 @@ if __name__ == '__main__':
         print "Avg, std pass off frame target ",i,":",round(np.mean(graph_dic['avg_pass_off_'+str(i)]),2), \
                 round(np.std(graph_dic['avg_pass_off_'+str(i)]),2)
     plt.show()
-
-
