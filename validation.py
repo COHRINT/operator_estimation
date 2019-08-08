@@ -219,9 +219,12 @@ class DataFusion(Human):
         else:
             self.confidence=np.load('HMM/hmm_con.npy')
 
-    def make_data(self,genus,graph=False):
+    def make_data(self,genus,num_tar,graph=False):
         model=Cumuliform(genus=genus,weather=False)
-        intensity_data=model.intensityModel+np.random.normal(0,2,(len(model.intensityModel)))
+        if num_tar==5:
+            intensity_data=model.intensityModel+np.random.normal(0,2,(len(model.intensityModel)))
+        elif num_tar==10:
+            intensity_data=model.intensityModel+np.random.normal(0,0.5,(len(model.intensityModel)))
         for j in range(len(intensity_data)):
             intensity_data[j]=max(intensity_data[j],1e-5)
         self.intensity_data=intensity_data

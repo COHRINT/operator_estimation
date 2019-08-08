@@ -136,12 +136,12 @@ if __name__ == '__main__':
             # initialize target type
             #  genus=np.random.randint(num_tar)
             genus=tar_seq[sim_num,n]
-            #  genus=3
+            #  genus=0
             # getting a prior from ML
             if cfg['starting_dist']=='assist':
                 #  ml_threshold=0.25
                 pass_off=0
-                param_tied_sim.make_data(genus)
+                param_tied_sim.make_data(genus,num_tar)
                 data_dic[genus].append(param_tied_sim.intensity_data)
                 param_tied_sim.frame=0
                 param_tied_sim.alphas={}
@@ -153,7 +153,7 @@ if __name__ == '__main__':
                 while (pass_off==0) and (param_tied_sim.frame<100):
                     param_tied_sim.probs=param_tied_sim.updateProbsML()
                     param_tied_sim.frame+=1
-                    pass_off=param_tied_sim.VOI2(num_tar,threshold,param_tied_sim.probs)
+                    #  pass_off=param_tied_sim.VOI2(num_tar,threshold,param_tied_sim.probs)
                 #  print param_tied_sim.frame
                 pass_off_tracker[n]=param_tied_sim.frame
                 pass_off_average.append(np.mean(pass_off_tracker[:n+1]))
@@ -210,6 +210,8 @@ if __name__ == '__main__':
             while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold) or (max(ind_sim_probs)<threshold):
                 if time.time()-start_tar>30:
                     break
+                if param_tied_sim.frame>98:
+                    break
                 #  tar_to_ask=None
                 #  if count_tied>0:
                 #      tar_to_ask=param_tied_sim.VOI(num_tar,obs,threshold)
@@ -222,8 +224,8 @@ if __name__ == '__main__':
                     full_sim_probs=full_sim.sampling_full(num_tar,obs)
                     full_times.append(time.time()-start)
                     count_full+=1
-                if max(param_tied_sim_probs)<threshold:
                     start=time.time()
+                if max(param_tied_sim_probs)<threshold:
                     param_tied_sim_probs=param_tied_sim.sampling_param_tied(num_tar,obs)
                     tied_times.append(time.time()-start)
                     count_tied+=1
@@ -322,6 +324,10 @@ if __name__ == '__main__':
             graph_dic['correct_full']=None
             graph_dic['pred_percent_ind']=None
             graph_dic['correct_ind']=None
+            graph_dic['pred_percent_ml']=None
+            graph_dic['correct_ml']=None
+            graph_dic['pred_percent_ml_alone']=None
+            graph_dic['correct_ml_alone']=None
 
         if graph_params['confusion']:
             graph_dic['true_tar_tied']=true_tar_tied
@@ -412,5 +418,5 @@ if __name__ == '__main__':
         #  print "Human Percent of correct observations:",sum(param_tied_sim.human_correct)/len(param_tied_sim.human_correct)
         #  for i in range(num_tar):
         #      print "Avg pass off frame target ",i,":",np.mean(pass_off_targets[i])
-        #  Graphing(graph_dic)
-        #  plt.show()
+        Graphing(graph_dic)
+        plt.show()
