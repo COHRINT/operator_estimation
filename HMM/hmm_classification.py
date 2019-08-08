@@ -238,6 +238,7 @@ class HMM_Classification():
         pred=[]
         for k in tqdm(range(num_events),ncols=100):
             genus=np.random.randint(num_tar)
+            #  genus=0
             species = Cumuliform(genus = genus,weather=False)
             data = species.intensityModel
             if num_tar==10:
@@ -255,7 +256,7 @@ class HMM_Classification():
 
             probs = {}
             for i in genNames:
-                probs[i] = .2
+                probs[i] = 1/num_tar
             
             count=0
             log_like=[]
