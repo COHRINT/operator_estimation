@@ -693,15 +693,18 @@ class DataFusion(Human):
         else:
             return None
 
-    def VOI2(self,num_tar,threshold,post):
-        num_samples=100
-        #TODO: We are using the full theta2, this can be done with the param tied version
+    def VOI_thetas(self,num_tar):
         theta1=np.empty((num_tar,2*num_tar))
         theta2=np.empty((2*num_tar*num_tar,2*num_tar))
         for X in range(num_tar):
             theta1[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_full[X,:])
             for prev_obs in range(2*num_tar):
                 theta2[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
+        return [theta1,theta2]
+
+    def VOI2(self,num_tar,threshold,post,theta1,theta2):
+        num_samples=100
+        #TODO: We are using the full theta2, this can be done with the param tied version
 
         right=1
         wrong=-1
