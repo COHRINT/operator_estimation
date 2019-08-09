@@ -424,16 +424,16 @@ class Graphing():
             correct_percent_ml_std=np.std(correct_percent_ml,axis=0)
             correct_percent_ml_alone_mean=np.mean(correct_percent_ml_alone,axis=0)
             correct_percent_ml_alone_std=np.std(correct_percent_ml_alone,axis=0)
-            plt.plot([n+5 for n in range(num_events-5)],correct_percent_mean[5:], label="w/Human Total Correct (Tied)",linewidth=4)
-            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_mean[5:]+correct_percent_std[5:],correct_percent_mean[5:]-correct_percent_std[5:],alpha=0.5)
+            plt.plot([n+5 for n in range(num_events-5)],correct_percent_mean[5:], label="w/Human Total Correct (Tied)")
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_mean[5:]+correct_percent_std[5:],correct_percent_mean[5:]-correct_percent_std[5:],alpha=0.2)
             plt.plot([n+5 for n in range(num_events-5)],correct_percent_full_mean[5:], label="w/Human Total Correct (Full)")
-            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_full_mean[5:]+correct_percent_full_std[5:],correct_percent_full_mean[5:]-correct_percent_full_std[5:],alpha=0.5)
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_full_mean[5:]+correct_percent_full_std[5:],correct_percent_full_mean[5:]-correct_percent_full_std[5:],alpha=0.2)
             plt.plot([n+5 for n in range(num_events-5)],correct_percent_ind_mean[5:], label="w/Human Total Correct (Ind)")
-            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_ind_mean[5:]+correct_percent_ind_std[5:],correct_percent_ind_mean[5:]-correct_percent_ind_std[5:],alpha=0.5)
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_ind_mean[5:]+correct_percent_ind_std[5:],correct_percent_ind_mean[5:]-correct_percent_ind_std[5:],alpha=0.2)
             plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml_mean[5:], label="Before Human Total Correct")
-            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_ml_mean[5:]+correct_percent_ml_std[5:],correct_percent_ml_mean[5:]-correct_percent_ml_std[5:],alpha=0.5)
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_ml_mean[5:]+correct_percent_ml_std[5:],correct_percent_ml_mean[5:]-correct_percent_ml_std[5:],alpha=0.2)
             plt.plot([n+5 for n in range(num_events-5)],correct_percent_ml_alone_mean[5:], label="No Human Total Correct")
-            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_ml_alone_mean[5:]+correct_percent_ml_alone_std[5:],correct_percent_ml_alone_mean[5:]-correct_percent_ml_alone_std[5:],alpha=0.5)
+            plt.fill_between([n+5 for n in range(num_events-5)],correct_percent_ml_alone_mean[5:]+correct_percent_ml_alone_std[5:],correct_percent_ml_alone_mean[5:]-correct_percent_ml_alone_std[5:],alpha=0.2)
             plt.legend()
         else:
             plt.plot([n+5 for n in range(num_events-5)],correct_percent[5:], label="w/Human Total Correct (Tied)",linewidth=4)
@@ -446,6 +446,7 @@ class Graphing():
         plt.ylabel('Percent Correct')
         plt.ylim(0,1.1)
         plt.title('Correct Classification')
+        plt.grid(True)
 
         fig.savefig('figures/percent_correct.png',bbox_inches='tight',pad_inches=0)
 
@@ -525,6 +526,7 @@ class Graphing():
         plt.xlabel('Recall')
         plt.ylabel('Precission')
         plt.title('Tied Sim')
+        plt.grid(True)
 
         # Full
         plt.subplot(232)
@@ -535,6 +537,7 @@ class Graphing():
         plt.xlabel('Recall')
         plt.ylabel('Precission')
         plt.title('Full Sim')
+        plt.grid(True)
 
         # Ind
         plt.subplot(233)
@@ -545,6 +548,7 @@ class Graphing():
         plt.xlabel('Recall')
         plt.ylabel('Precission')
         plt.title('Ind Sim')
+        plt.grid(True)
 
         # ML
         plt.subplot(234)
@@ -555,6 +559,7 @@ class Graphing():
         plt.xlabel('Recall')
         plt.ylabel('Precission')
         plt.title('HMM Sim')
+        plt.grid(True)
 
         # ML no pass
         plt.subplot(235)
@@ -565,6 +570,7 @@ class Graphing():
         plt.xlabel('Recall')
         plt.ylabel('Precission')
         plt.title('HMM No Human Sim')
+        plt.grid(True)
 
         fig.savefig('figures/precision_recall.png',bbox_inches='tight',pad_inches=0)
 
@@ -582,6 +588,7 @@ class Graphing():
         plt.ylabel('Intensity (Units)')
         plt.title('Average Data Seen')
         plt.legend()
+        plt.grid(True)
 
         fig.savefig('figures/data.png',bbox_inches='tight',pad_inches=0)
 
@@ -599,6 +606,7 @@ class Graphing():
         plt.ylabel('Average Pass Off Frame')
         plt.ylim(-5,105)
         plt.title('Average Pass Off Frame Over Time')
+        plt.grid(True)
 
         fig.savefig('figures/pass_off.png',bbox_inches='tight',pad_inches=0)
 
