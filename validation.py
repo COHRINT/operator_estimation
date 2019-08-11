@@ -5,6 +5,7 @@ import scipy.stats
 from scipy.special import gamma, psi, polygamma
 import random
 import copy
+import math
 import sys
 import os
 import itertools
@@ -180,6 +181,50 @@ class Human():
         return obs
 
     def HumanAnswer(self,num_tar,real_target,obs,theta1,theta2):
+        def pick_obs(obs,obs_type,real_target,num_tar):
+            #tp
+            if obs_type==0:
+                obs.append(2*real_target)
+            #fn
+            elif obs_type==2:
+                obs.append(2*real_target+1)
+            else:
+                choices=range(2*num_tar)
+                # the first gets rid of the tp, 2nd the fn
+                del choices[2*real_target]
+                del choices[2*real_target]
+                #fp
+                if obs_type==1:
+                    for i in range(num_tar):
+                        if i!=real_target:
+                            choices.remove(2*i+1)
+                    obs.append(np.random.choice(choices))
+                #tn
+                elif obs_type==3:
+                    for i in range(num_tar):
+                        if i!=real_target:
+                            choices.remove(2*i)
+                    obs.append(np.random.choice(choices))
+            return obs
+
+        if len(obs)==0:
+            obs_type=np.random.choice(range(4),p=theta1)
+            obs=pick_obs(obs,obs_type,real_target,num_tar)
+        else:
+            prev_obs=obs[-1]
+            if prev_obs/2==real_target:
+                obs_type=np.random.choice(range(4),p=theta2[0,:])
+            elif math.floor(prev_obs/2)==real_target:
+                obs_type=np.random.choice(range(4),p=theta2[1,:])
+            elif prev_obs%2==0:
+                obs_type=np.random.choice(range(4),p=theta2[2,:])
+            elif prev_obs%2==1:
+                obs_type=np.random.choice(range(4),p=theta2[3,:])
+            obs=pick_obs(obs,obs_type,real_target,num_tar)
+
+        return obs
+
+    def HumanAnswer_full(self,num_tar,real_target,obs,theta1,theta2):
         if len(obs)==0:
             prob=theta1[real_target,:]
             obs=[np.random.choice(range(2*num_tar),p=prob)]
@@ -188,12 +233,6 @@ class Human():
             prob=theta2[real_target*2*num_tar+prev_obs,:]
             obs.append(np.random.choice(range(2*num_tar),p=prob))
         return obs
-
-    #  def HumanAnswer2(self,num_tar,real_target,obs,theta2):
-    #      prev_obs=obs[-1]
-    #      prob=self.theta2[real_target*2*num_tar+prev_obs,:]
-    #      return np.random.choice(range(2*num_tar),p=prob)
-        #  return obs
 
 class DataFusion(Human):
     def __init__(self,num_tar):
@@ -693,18 +732,21 @@ class DataFusion(Human):
         else:
             return None
 
-    def VOI_thetas(self,num_tar):
-        theta1=np.empty((num_tar,2*num_tar))
-        theta2=np.empty((2*num_tar*num_tar,2*num_tar))
-        for X in range(num_tar):
-            theta1[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_full[X,:])
-            for prev_obs in range(2*num_tar):
-                theta2[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
+    def VOI_thetas(self):
+        theta2=np.empty((4,4))
+        theta1=scipy.stats.dirichlet.mean(alpha=self.theta1)
+        for i in range(4):
+            theta2[i,:]=scipy.stats.dirichlet.mean(alpha=self.theta2[i,:])
+        #  theta1=np.empty((num_tar,2*num_tar))
+        #  theta2=np.empty((2*num_tar*num_tar,2*num_tar))
+        #  for X in range(num_tar):
+        #      theta1[X,:]=scipy.stats.dirichlet.mean(alpha=self.theta1_full[X,:])
+        #      for prev_obs in range(2*num_tar):
+        #          theta2[X*2*num_tar+prev_obs,:]=scipy.stats.dirichlet.mean(alpha=self.theta2_full[X,prev_obs,:])
         return [theta1,theta2]
 
-    def VOI2(self,num_tar,threshold,post,theta1,theta2):
+    def VOI_tied(self,num_tar,threshold,post,theta1,theta2):
         num_samples=100
-        #TODO: We are using the full theta2, this can be done with the param tied version
 
         right=1
         wrong=-1
@@ -723,6 +765,79 @@ class DataFusion(Human):
                         obs=self.HumanAnswer(num_tar,X,obs,theta1,theta2)
                     else:
                         obs=self.HumanAnswer(num_tar,X,obs,theta1,theta2)
+                    for i in self.names:
+                        if len(obs)==1:
+                            if obs[0]/2==self.names.index(i):
+                                post_sample[i]*=theta1[0]
+                            elif math.floor(obs[0]/2)==self.names.index(i):
+                                post_sample[i]*=theta1[1]
+                            elif obs[0]%2==0:
+                                post_sample[i]*=theta1[2]
+                            elif obs[0]%2==1:
+                                post_sample[i]*=theta1[3]
+                        else:
+                            if obs[-2]/2==self.names.index(i):
+                                ind_0=0
+                            elif math.floor(obs[-2]/2)==self.names.index(i):
+                                ind_0=1
+                            elif obs[-2]%2==0:
+                                ind_0=2
+                            elif obs[-2]%2==1:
+
+                                ind_0=3
+                            if obs[-1]/2==self.names.index(i):
+                                ind_1=0
+                            elif math.floor(obs[-1]/2)==self.names.index(i):
+                                ind_1=1
+                            elif obs[-1]%2==0:
+                                ind_1=2
+                            elif obs[-1]%2==1:
+                                ind_1=3
+                            post_sample[i]*=theta2[ind_0,ind_1]
+                    # normalize
+                    suma=sum(post_sample.values())
+                    for i in self.names:
+                        post_sample[i]=np.log(post_sample[i])-np.log(suma) 
+                        post_sample[i]=np.exp(post_sample[i])
+                if np.argmax(post_sample.values())==X:
+                    R_human[X]+=right
+                else:
+                    R_human[X]+=wrong
+                if classification[n]==X:
+                    R_bot[X]+=right
+                else:
+                    R_bot[X]+=wrong
+        #  print R_human*post.values()
+        #  print R_bot*post.values()
+        #  print sum(R_human*post.values())/num_samples,sum(R_bot*post.values())/num_samples
+        VOI=(sum(R_human*post.values())/num_samples)-(sum(R_bot*post.values())/num_samples)
+        #  print VOI
+        #  sys.exit()
+        if VOI>.45:
+            return 1
+        else:
+            return 0
+
+    def VOI_full(self,num_tar,threshold,post,theta1,theta2):
+        num_samples=100
+
+        right=1
+        wrong=-1
+        R_human=np.zeros(num_tar)
+        R_bot=np.zeros(num_tar)
+        #  print self.confidence
+        for X in range(num_tar):
+            # HMM sample
+            classification=np.random.choice(range(num_tar),size=num_samples,p=self.confidence[X])
+            for n in range(num_samples):
+                # human sample
+                obs=[]
+                post_sample=copy.copy(post)
+                while max(post_sample.values())<threshold:
+                    if len(obs)==0:
+                        obs=self.HumanAnswer_full(num_tar,X,obs,theta1,theta2)
+                    else:
+                        obs=self.HumanAnswer_full(num_tar,X,obs,theta1,theta2)
                     for i in self.names:
                         if len(obs)==1:
                             post_sample[i]*=theta1[self.names.index(i),obs[0]]

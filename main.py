@@ -141,37 +141,37 @@ if __name__ == '__main__':
             if cfg['starting_dist']=='assist':
                 #  ml_threshold=0.25
                 pass_off=0
-                full_sim.make_data(genus,num_tar)
-                data_dic[genus].append(full_sim.intensity_data)
-                full_sim.frame=0
-                full_sim.alphas={}
-                full_sim.probs={}
-                for i in full_sim.names:
-                    full_sim.alphas[i]=[-1,-1]
-                    full_sim.probs[i]=1/num_tar
+                param_tied_sim.make_data(genus,num_tar)
+                data_dic[genus].append(param_tied_sim.intensity_data)
+                param_tied_sim.frame=0
+                param_tied_sim.alphas={}
+                param_tied_sim.probs={}
+                for i in param_tied_sim.names:
+                    param_tied_sim.alphas[i]=[-1,-1]
+                    param_tied_sim.probs[i]=1/num_tar
                 #  while max(param_tied_sim.probs.values())<ml_threshold:
-                thetas=full_sim.VOI_thetas(num_tar)
-                while (pass_off==0) and (full_sim.frame<100):
-                    full_sim.probs=full_sim.updateProbsML()
-                    full_sim.frame+=1
-                    pass_off=full_sim.VOI2(num_tar,threshold,full_sim.probs,thetas[0],thetas[1])
+                thetas=param_tied_sim.VOI_thetas()
+                while (pass_off==0) and (param_tied_sim.frame<100):
+                    param_tied_sim.probs=param_tied_sim.updateProbsML()
+                    param_tied_sim.frame+=1
+                    pass_off=param_tied_sim.VOI_tied(num_tar,threshold,param_tied_sim.probs,thetas[0],thetas[1])
                 #  print param_tied_sim.frame
-                pass_off_tracker[n]=full_sim.frame
+                pass_off_tracker[n]=param_tied_sim.frame
                 pass_off_average.append(np.mean(pass_off_tracker[:n+1]))
-                pass_off_targets[genus].append(full_sim.frame)
-                param_tied_sim.probs=copy.copy(full_sim.probs)
-                ind_sim.probs=copy.copy(full_sim.probs)
-                chosen=np.argmax(full_sim.probs.values())
+                pass_off_targets[genus].append(param_tied_sim.frame)
+                full_sim.probs=copy.copy(param_tied_sim.probs)
+                ind_sim.probs=copy.copy(param_tied_sim.probs)
+                chosen=np.argmax(param_tied_sim.probs.values())
                 if genus==chosen:
                     correct_ml[n]=1
-                pred_percent_ml.append(max(full_sim.probs.values()))
+                pred_percent_ml.append(max(param_tied_sim.probs.values()))
                 correct_percent_ml.append(sum(correct_ml)/(n+1))
-                pred_tar_ml.append(np.argmax(full_sim.probs.values()))
+                pred_tar_ml.append(np.argmax(param_tied_sim.probs.values()))
                 #continue even after passing off for comparison
-                continue_probs=copy.copy(full_sim.probs)
-                while full_sim.frame<100:
-                    continue_probs=full_sim.updateProbsML()
-                    full_sim.frame+=1
+                continue_probs=copy.copy(param_tied_sim.probs)
+                while param_tied_sim.frame<100:
+                    continue_probs=param_tied_sim.updateProbsML()
+                    param_tied_sim.frame+=1
                 if genus==np.argmax(continue_probs.values()):
                     correct_ml_alone[n]=1
                 pred_percent_ml_alone.append(max(continue_probs.values()))
