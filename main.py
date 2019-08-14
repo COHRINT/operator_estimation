@@ -57,7 +57,7 @@ if __name__ == '__main__':
     human_type=cfg['human']
     tar_seq=np.load(str(num_tar)+'_tar.npy')
 
-    for sim_num in range(num_sims):
+    for sim_num in range(0,4):
         #data
         data_dic={}
         for i in range(num_tar):

@@ -943,10 +943,11 @@ if __name__ == '__main__':
         graph_dic['human_correct_overall'].extend(new_dic['human_correct_overall'])
 
     
-    graph_dic['theta1']=np.mean(graph_dic['theta1'],axis=0)
-    graph_dic['theta1_correct']=np.mean(graph_dic['theta1_correct'],axis=1)
-    graph_dic['theta2']=np.mean(graph_dic['theta2'],axis=2)
-    graph_dic['theta2_correct']=np.mean(graph_dic['theta2_correct'],axis=2)
+    if num_sims>1:
+        graph_dic['theta1']=np.mean(graph_dic['theta1'],axis=0)
+        graph_dic['theta1_correct']=np.mean(graph_dic['theta1_correct'],axis=1)
+        graph_dic['theta2']=np.mean(graph_dic['theta2'],axis=2)
+        graph_dic['theta2_correct']=np.mean(graph_dic['theta2_correct'],axis=2)
 
     Graphing(graph_dic)
     print 'Human Percent of Correct Observations:',sum(graph_dic['human_correct_overall'])/len(graph_dic['human_correct_overall'])

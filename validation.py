@@ -76,16 +76,22 @@ class Human():
         base_table_real=np.ones((num_tar,2*num_tar))
         base_table_real*=5
         human_rates=np.array([[10,0.4,1.67,0.4],[9,0.7,2,0.9],[8,1,2.7,1.3],[7,1.2,3.4,1.7],[6,1.3,4,2.1],[5,1.5,5,2.5]])
-        for i in range(5):
+        for i in range(num_tar):
             #tp
-            base_table_real[i,2*i]*=human_rates[human][0]
-            for j in range(5):
+            if num_tar==10:
+                base_table_real[i,2*i]*=1.2*human_rates[human][0]
+            else:
+                base_table_real[i,2*i]*=human_rates[human][0]
+            for j in range(num_tar):
                 if i==j:
                     #fn
                     base_table_real[i,2*j+1]*=human_rates[human][1]
                 else:
                     #tn
-                    base_table_real[i,2*j+1]*=human_rates[human][2]
+                    if num_tar==10:
+                        base_table_real[i,2*j+1]*=1.6*human_rates[human][2]
+                    else:
+                        base_table_real[i,2*j+1]*=human_rates[human][2]
                     #fp
                     base_table_real[i,2*j]*=human_rates[human][3]
             #  if human=='good':
@@ -112,6 +118,7 @@ class Human():
             #              base_table_real[i,2*j+1]*=5
             #              #fp
             #              base_table_real[i,2*j]*=2.5
+        #  print base_table_real
         for i in range(2*num_tar):
             table_real[:,:,i]=base_table_real
         for i in range(2*num_tar):
@@ -120,6 +127,8 @@ class Human():
         table_real=np.swapaxes(table_real,1,2)
         table_real+=np.random.uniform(-1,1,(num_tar,2*num_tar,2*num_tar))
         table_real[table_real<0]=0.1
+        #  print table_real.shape
+        #  sys.exit()
         self.theta2_correct=np.zeros((2*num_tar*num_tar,2*num_tar))
         #  self.table_compare=np.zeros((2*num_tar*num_tar,2*num_tar))
         for X in range(num_tar):
