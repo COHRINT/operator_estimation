@@ -57,7 +57,7 @@ if __name__ == '__main__':
     human_type=cfg['human']
     tar_seq=np.load(str(num_tar)+'_tar.npy')
 
-    for sim_num in range(0,4):
+    for sim_num in range(0,5):
         #data
         data_dic={}
         for i in range(num_tar):
@@ -151,7 +151,7 @@ if __name__ == '__main__':
                     param_tied_sim.probs[i]=1/num_tar
                 #  while max(param_tied_sim.probs.values())<ml_threshold:
                 thetas=param_tied_sim.VOI_thetas()
-                while (pass_off==0) and (param_tied_sim.frame<100):
+                while (pass_off==0) and (param_tied_sim.frame<3):
                     param_tied_sim.probs=param_tied_sim.updateProbsML()
                     param_tied_sim.frame+=1
                     pass_off=param_tied_sim.VOI_tied(num_tar,threshold,param_tied_sim.probs,thetas[0],thetas[1])

@@ -35,7 +35,10 @@ class Human():
         self.human_correct=[]
 
         #theta 1
-        self.table=[5,2,0.5,8]
+        if num_tar==5:
+            self.table=[5,2,0.5,8]
+        elif num_tar==10:
+            self.table=[5,0.5,0.5,8]
         self.theta1=copy.deepcopy(self.table)
         #  self.theta1=scipy.stats.dirichlet.mean(alpha=self.table)
         table_real=self.table+np.random.uniform(-1,1,4)
@@ -79,7 +82,7 @@ class Human():
         for i in range(num_tar):
             #tp
             if num_tar==10:
-                base_table_real[i,2*i]*=1.2*human_rates[human][0]
+                base_table_real[i,2*i]*=3*human_rates[human][0]
             else:
                 base_table_real[i,2*i]*=human_rates[human][0]
             for j in range(num_tar):
@@ -89,7 +92,7 @@ class Human():
                 else:
                     #tn
                     if num_tar==10:
-                        base_table_real[i,2*j+1]*=1.6*human_rates[human][2]
+                        base_table_real[i,2*j+1]*=2*human_rates[human][2]
                     else:
                         base_table_real[i,2*j+1]*=human_rates[human][2]
                     #fp
