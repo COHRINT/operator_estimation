@@ -272,10 +272,10 @@ class DataFusion(Human):
 
     def make_data(self,genus,num_tar,graph=False):
         model=Cumuliform(genus=genus,weather=False)
-        if num_tar==5:
-            intensity_data=model.intensityModel+np.random.normal(0,2,(len(model.intensityModel)))
-        elif num_tar==10:
-            intensity_data=model.intensityModel+np.random.normal(0,0.5,(len(model.intensityModel)))
+        #  if num_tar==5:
+        intensity_data=model.intensityModel+np.random.normal(0,2,(len(model.intensityModel)))
+        #  elif num_tar==10:
+        #      intensity_data=model.intensityModel+np.random.normal(0,0.5,(len(model.intensityModel)))
         for j in range(len(intensity_data)):
             intensity_data[j]=max(intensity_data[j],1e-5)
         self.intensity_data=intensity_data
@@ -759,6 +759,10 @@ class DataFusion(Human):
 
     def VOI_tied(self,num_tar,threshold,post,theta1,theta2):
         num_samples=100
+        if num_tar==5:
+            VOI_thresh=0.45
+        elif num_tar==10:
+            VOI_thresh=0.75
 
         right=1
         wrong=-1
@@ -825,7 +829,7 @@ class DataFusion(Human):
         VOI=(sum(R_human*post.values())/num_samples)-(sum(R_bot*post.values())/num_samples)
         #  print VOI
         #  sys.exit()
-        if VOI>.45:
+        if VOI>VOI_thresh:
             return 1
         else:
             return 0

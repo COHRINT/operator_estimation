@@ -62,10 +62,10 @@ class HMM_Classification():
     def buildDataSet(self, num_sets=100, num_tar=5):
         if num_tar==10:
             allSeries=[[],[],[],[],[],[],[],[],[],[]]
-            var=0.1
+            #  var=0.1
         else:
             allSeries=[[],[],[],[],[]]
-            var=2
+        var=2
         for i in range(num_tar):
             model=Cumuliform(genus=i,weather=False)
             b=copy.deepcopy(model.intensityModel)
@@ -241,10 +241,10 @@ class HMM_Classification():
             #  genus=0
             species = Cumuliform(genus = genus,weather=False)
             data = species.intensityModel
-            if num_tar==10:
-                var=0.5
-            else:
-                var=2
+            #  if num_tar==10:
+            #      var=0.5
+            #  else:
+            var=2
             data=data+np.random.normal(0,var,(len(data)))
 
 
@@ -357,4 +357,4 @@ if __name__ == '__main__':
         hc.buildModels(dataSet,10)
 
     if 'test' in commands:
-        hc.testHMM(100,10)
+        hc.testHMM(1000,10)
