@@ -57,7 +57,7 @@ if __name__ == '__main__':
     human_type=cfg['human']
     tar_seq=np.load(str(num_tar)+'_tar.npy')
 
-    for sim_num in range(0,5):
+    for sim_num in range(num_sims):
         #data
         data_dic={}
         for i in range(num_tar):
@@ -208,7 +208,7 @@ if __name__ == '__main__':
             count_full=0
             count_tied=0
             count_ind=0
-            if pass_off_tracker[n]!=99:
+            if pass_off_tracker[n]!=100:
                 while (max(full_sim_probs)<threshold) or (max(param_tied_sim_probs)<threshold) or (max(ind_sim_probs)<threshold):
                     if time.time()-start_tar>30:
                         break

@@ -762,7 +762,7 @@ class DataFusion(Human):
         if num_tar==5:
             VOI_thresh=0.45
         elif num_tar==10:
-            VOI_thresh=0.75
+            VOI_thresh=0.64
 
         right=1
         wrong=-1

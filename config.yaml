@@ -1,5 +1,5 @@
 starting_dist: 'assist' #uniform or assist
-num_tar: 10
+num_tar: 5
 num_sims: 30
 threshold: 0.9
 # human: 'good'
