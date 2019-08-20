@@ -759,6 +759,7 @@ class DataFusion(Human):
 
     def VOI_tied(self,num_tar,threshold,post,theta1,theta2):
         num_samples=100
+
         if num_tar==5:
             VOI_thresh=0.45
         elif num_tar==10:
