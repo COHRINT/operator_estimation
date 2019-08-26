@@ -859,6 +859,9 @@ if __name__ == '__main__':
     num_tar=cfg['num_tar']
     graph_params=cfg['graphs']
     graph_dic=pickle.load(open('figures/graphing_data/graphing_data0.p','rb'))
+    ind_times=[]
+    full_times=[]
+    tied_times=[]
     if num_sims>1:
         graph_dic['correct_percent_tied']=[graph_dic['correct_percent_tied']]
         graph_dic['correct_percent_full']=[graph_dic['correct_percent_full']]
@@ -910,6 +913,9 @@ if __name__ == '__main__':
             graph_dic['multiple']=True
 
         if graph_params['timing']:
+            tied_times.append(sum(new_dic['tied_times'])+sum(new_dic['tied_match_times']))
+            full_times.append(sum(new_dic['full_times'])+sum(new_dic['full_match_times']))
+            ind_times.append(sum(new_dic['ind_times'])+sum(new_dic['ind_match_times']))
             graph_dic['tied_times'].extend(new_dic['tied_times'])
             graph_dic['tied_number'].extend(new_dic['tied_number'])
             graph_dic['tied_match_times'].extend(new_dic['tied_match_times'])
@@ -954,4 +960,7 @@ if __name__ == '__main__':
     for i in range(num_tar):
         print "Avg, std pass off frame target ",i,":",round(np.mean(graph_dic['avg_pass_off_'+str(i)]),2), \
                 round(np.std(graph_dic['avg_pass_off_'+str(i)]),2)
+    print "Total Tied Times:",round(np.mean(tied_times),2)
+    print "Total Full Times:",round(np.mean(full_times),2)
+    print "Total Ind Times:",round(np.mean(ind_times),2)
     plt.show()
