@@ -3,3 +3,7 @@
 *.pdf
 *.jpg
 /figures/
+setup.sh~
+requirements.txt~
+config.yaml~
+.gitignore~
