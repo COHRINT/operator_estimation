@@ -318,7 +318,7 @@ class HMM_Classification():
 
 
         confidence=normalize(confidence,axis=1,norm='l1')
-        np.save(confidenceName,confidence)
+        #  np.save(confidenceName,confidence)
         #  print confidence
         print (correct/num_events)
         right_mean=np.mean(right,axis=0)
@@ -344,7 +344,7 @@ class HMM_Classification():
         for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
             plt.text(j,i,format(100*cm[i,j],'.1f')+'%',horizontalalignment="center",color="white" if cm[i,j]>cm.max()/2 else "black")
 
-        plt.show()
+        #  plt.show()
 
 if __name__ == '__main__':
     hc=HMM_Classification()

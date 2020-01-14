@@ -7,7 +7,7 @@ import random
 
 
 class AbstractProfile():
-	def __init__(self,startPose=[0,0],genus = 0,weather = True, startTime=0):
+	def __init__(self,startPose=[0,0],genus = 0,weather = False, startTime=0):
 		self.time = startTime; 
 		state = startPose; 
 		self.weather = weather;
@@ -616,7 +616,7 @@ def testFamily(profName,makeFigs = False):
 	plt.legend()
 
 	if(makeFigs):
-		plt.savefig('../imgs/Family_{}.png'.format(profName.__name__)); 
+		plt.savefig('Family_{}.png'.format(profName.__name__)); 
 	else:
 		plt.show(); 
 
@@ -633,12 +633,12 @@ if __name__ == '__main__':
    	# allProf.append(Altostratus(startPose=[40,40])); 
 
    	#testProfile(Cumulonibiform(genus = 0),duration = 100,animate = False)
-   	figs = False; 
-   	# testFamily(Stratiform,figs);
-   	# testFamily(Cirriform,figs); 
-   	# testFamily(Stratocumuliform,figs); 
+   	figs = True; 
+        testFamily(Stratiform,figs);
+        testFamily(Cirriform,figs);
+        testFamily(Stratocumuliform,figs);
    	testFamily(Cumuliform,figs); 
-   	# testFamily(Cumulonibiform,figs); 
+        testFamily(Cumulonibiform,figs);
 
 
 

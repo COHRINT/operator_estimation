@@ -1,0 +1,17 @@
+starting_dist: 'assist' #uniform or assist
+num_tar: 10
+num_sims: 30
+threshold: 0.9
+# human: 'good'
+human: 0
+graphs:
+    theta_val: True
+    gibbs_val: False
+    percent_correct: True
+    confusion: True
+    moment_match: False
+    timing: True
+    precision_recall: True
+    # these only work with assist starting dist, no data is needed for uniform
+    data: True
+    pass_off: True
